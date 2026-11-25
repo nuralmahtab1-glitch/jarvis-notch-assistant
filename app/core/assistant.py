@@ -321,7 +321,35 @@ class Assistant(QObject):
                 win.play_spotify(a["query"]); return f"Searching Spotify for {a['query']}."
             if it.name == "screenshot":
                 path = win.screenshot(); return "Screenshot saved to your Pictures folder."
+            if it.name == "side_by_side":
+                self._side_by_side(a["items"], src)
+                return None
+            if it.name == "open_many":
+                from app.winio import layout as _lay
+                done, bad = [], []
+                for n in a["items"]:
+                    spec = _lay.resolve(n, self.cfg["websites"])
+                    ok = _lay.launch(spec, next((s for s in [_lay.resolve(x) for x in a["items"]] if s["kind"] == "browser"), {}).get("exe"), win.open_app)
+                    (done if ok else bad).append(spec["label"])
+                if bad:
+                    return f"I opened {', '.join(done)}, but could not open {', '.join(bad)}." if done else f"I could not open {', '.join(bad)}."
+                return "Opening " + " and ".join(done) + "."
+            if it.name == "search_site":
+                from app.tools.intents import SEARCH_SITES
+                from urllib.parse import quote
+                win.open_url(SEARCH_SITES[a["site"]] + quote(a["query"]))
+                return f"Searching {a['site'].title()} for {a['query']}."
+            if it.name == "chain":
+                self._run_chain(a["steps"], src)
+                return None
+            if it.name == "snap_window":
+                from app.winio import layout
+                return f"Snapped to the {a['side']}." if layout.snap_foreground(a["side"]) else "I could not find a window to move."
             if it.name == "open_app":
+                from app.winio import layout as _lay
+                spec = _lay.resolve(a["name"], self.cfg["websites"])
+                if spec["kind"] == "site":
+                    win.open_url(spec["url"]); return f"Opening {spec['label']}."
                 key = a["name"].lower().strip()
                 if self.apps and key not in win.APP_ALIASES:      # well-known names (notepad, terminal...) keep their exact mapping
                     hit = self.apps.launch_by_name(a["name"])
@@ -784,6 +812,56 @@ class Assistant(QObject):
             self.ctl.setControls({"power": mode} if ok else {})
             if not ok:
                 self._panel_msg("Windows would not change the power mode")
+
+    def _run_chain(self, steps: list[str], src: str):
+        """'open youtube and after that search for avengers': run the steps in order, giving a browser time to open."""
+        from app.tools.intents import SEARCH_SITES, Intent
+        replies: list[str] = []
+        state = {"site": None}
+        self.ctl.keepAwake(30)
+        self.ctl.setMode("working"); self.ctl.setText("On it", "")
+
+        def step(i: int):
+            if i >= len(steps):
+                self.say(" ".join(r for r in replies if r) or "Done.", src)
+                return
+            text = steps[i]
+            it = parse(text)
+            if it is None and i == 0:
+                it = parse("open " + text)                       # a bare "youtube" as the first step means open it
+            if it is not None and it.name == "search_web" and state["site"]:
+                it = Intent("search_site", {"site": state["site"], "query": it.args["query"]})   # search where we just opened
+            if it is None or it.name == "chain":
+                replies.append(f"I did not understand '{text}'.")
+                return step(len(steps))
+            if it.name in ("open_app", "open_many", "side_by_side"):
+                state["site"] = next((k for k in SEARCH_SITES if k in text.lower()), state["site"])
+            reply = self.run_intent(it, src)
+            if reply:
+                replies.append(reply)
+            QTimer.singleShot(2500 if it.name in ("open_app", "open_many") else 300, lambda: step(i + 1))
+        step(0)
+
+    def _side_by_side(self, items: list[str], src: str):
+        """Open two things and put them left and right. Runs in the background: windows take a few seconds to appear."""
+        from app.winio import layout
+        self.ctl.keepAwake(30)
+        self.ctl.setMode("working"); self.ctl.setText("Setting up your windows", "")
+
+        def work():
+            try:
+                placed, failed = layout.side_by_side(items, win.open_app, self.cfg["websites"])
+            except Exception as e:
+                print("[layout]", e)
+                placed, failed = [], items
+            if placed and not failed:
+                msg = f"Done. {placed[0][0]} on the left and {placed[1][0]} on the right." if len(placed) == 2 else "Done."
+            elif placed:
+                msg = f"I placed {placed[0][0]}, but could not open {', '.join(failed)}."
+            else:
+                msg = "I could not open those. Try saying the full names."
+            self.ui(lambda: self.say(msg, src))
+        threading.Thread(target=work, daemon=True).start()
 
     def take_screenshot_from_panel(self):
         def work():

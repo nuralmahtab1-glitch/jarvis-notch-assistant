@@ -27,6 +27,8 @@ Made by Nur Al Mahtab. Jarvis is a voice assistant that lives in a small pill at
 - "Set a timer for 10 minutes." / "Remind me to call mum at 6." / "Add milk to my to-do list."
 - "Open Spotify." / "Volume 40." / "Turn Wi-Fi off." / "Take a screenshot."
 - "Don't let my laptop sleep." / "Let it sleep again."
+- "Open YouTube and Chrome side by side." / "Open Notepad and Calculator." / "Snap this window to the left."
+- "Open YouTube and after that search for avengers." / "Search YouTube for lofi beats." / "Find a laptop on Amazon."
 - "Start the teleprompter." (copy your script first) / "Show the menu."
 - "What's Claude doing?" (needs Claude Code connected, see below)
 - Questions and writing ("write a short email saying I'll be late") need the AI brain, see below.

@@ -95,15 +95,42 @@ def awake_minutes(t: str) -> int | None:
     return int(max(1, min(24 * 60, n * (60 if m.group(2).startswith("h") else 1))))
 
 
+SEARCH_SITES = {
+    "youtube": "https://www.youtube.com/results?search_query=", "amazon": "https://www.amazon.com/s?k=",
+    "github": "https://github.com/search?q=", "reddit": "https://www.reddit.com/search/?q=",
+    "wikipedia": "https://en.wikipedia.org/w/index.php?search=", "google maps": "https://www.google.com/maps/search/",
+    "maps": "https://www.google.com/maps/search/", "netflix": "https://www.netflix.com/search?q=",
+    "spotify": "https://open.spotify.com/search/", "twitter": "https://x.com/search?q=",
+}
+CHAIN_SPLIT = re.compile(r"\s+(?:and\s+)?(?:then|after that|afterwards|and after that|next)\s+|\s*,\s*then\s+", re.I)
+
+
+def parse_chain(t: str) -> Intent | None:
+    """'open youtube and after that search for avengers' -> two steps run in order (only when it clearly starts with opening)."""
+    parts = [p.strip(" ,") for p in CHAIN_SPLIT.split(t) if p.strip(" ,")]
+    if not 2 <= len(parts) <= 3 or not re.match(r"(?:open|launch|start|go to)\b", parts[0]):
+        return None
+    if any(len(p.split()) > 12 for p in parts):
+        return None
+    return Intent("chain", {"steps": parts})
+
+
 def parse(text: str, now: datetime | None = None) -> Intent | None:
     t = _norm(text)
     if not t:
         return None
+    chain = parse_chain(t)
+    if chain:
+        return chain
 
     if NO_SLEEP.search(t):                      # "don't let it sleep" must win over "let it sleep"
         return Intent("keep_awake", {"on": True, "minutes": awake_minutes(t), "display": None})
     if AWAKE_OFF.search(t):
         return Intent("keep_awake", {"on": False, "minutes": None})
+    from app.winio.layout import parse_layout          # imported lazily: it loads Windows libraries
+    lay = parse_layout(t)
+    if lay:
+        return Intent("snap_window", {"side": lay[1][0]}) if lay[0] == "snap" else Intent("side_by_side", {"items": lay[1]})
     if re.search(r"(stop|close|end|hide|turn off) (the |my )?(teleprompter|prompter)", t):
         return Intent("prompter_stop")
     if re.search(r"(start|open|begin|show|run|use) (the |my )?(teleprompter|prompter)|read (me )?my script|teleprompter", t):
@@ -239,10 +266,24 @@ def parse(text: str, now: datetime | None = None) -> Intent | None:
         return Intent("controls_open")
     if re.search(r"battery( level| status| percentage)?|how much battery|how much (juice|charge|power) (is )?(do i have )?(left|remaining)|how much (juice|charge)", t):
         return Intent("battery")
+    m = re.match(r"(?:open|launch|start|run) (.+?)(?: and | & |, | plus )(.+)$", t)
+    if m:                                        # "open youtube and chrome": open each one, not an app called "youtube and chrome"
+        items = [re.sub(r"^(?:the|my|up)\s+", "", p.strip(" ,")) for p in re.split(r"\s+and\s+|\s*&\s*|\s*,\s*|\s+plus\s+", t.split(" ", 1)[1])]
+        items = [re.sub(r"^(?:open|launch|start)\s+", "", p) for p in items if p]
+        if 2 <= len(items) <= 4 and all(1 <= len(p.split()) <= 3 for p in items):
+            return Intent("open_many", {"items": items})
     m = re.match(r"(?:open|launch|start|run) (.+)", t)
     if m:
         return Intent("open_app", {"name": m.group(1).strip()})
-    m = re.match(r"(?:search|google|look up|search for|search the web for) (.+)", t)
+    site_names = "|".join(sorted(SEARCH_SITES, key=len, reverse=True))
+    m = (re.match(rf"(?:search|look up|find) (?:on |in )?({site_names}) (?:for )?(.+)$", t)
+         or re.match(rf"({site_names}) search (?:for )?(.+)$", t))
+    if m:
+        return Intent("search_site", {"site": m.group(1), "query": m.group(2).strip()})
+    m = re.match(rf"(?:search|look up|find) (?:for )?(.+?) (?:on|in) ({site_names})$", t)
+    if m:
+        return Intent("search_site", {"site": m.group(2), "query": m.group(1).strip()})
+    m = re.match(r"(?:search the web for|search for|look up|search|google) (.+)", t)
     if m:
         return Intent("search_web", {"query": m.group(1).strip()})
     m = re.match(r"(?:go to|open website|visit) (\S+\.\S+)", t)
