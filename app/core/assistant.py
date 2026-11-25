@@ -515,8 +515,13 @@ class Assistant(QObject):
             ap = next(iter(self.tracker.pending.values()), None)
             self.ctl.wake(); self.ctl.keepAwake(40); win.chime() if prev != "needs_you" else None
             self.ctl.setMode("claudeNeeds")
-            self.ctl.setText("Claude needs your permission" + (" (risky)" if ap and ap.risky else ""),
-                             (ap.description if ap else s.last_action)[:60])
+            if s.source == "web":                        # the extension can tell you, but only you can approve in the browser
+                self.ctl.setNeedsButtons(False)
+                self.ctl.setText("Claude on the web needs you", "Open the browser tab to answer")
+            else:
+                self.ctl.setNeedsButtons(True)
+                self.ctl.setText("Claude needs your permission" + (" (risky)" if ap and ap.risky else ""),
+                                 (ap.description if ap else s.last_action)[:60])
             if prev != "needs_you" and self.cfg["claude_speak"].get("needs_you") and not quiet and self.speaker and not self.cfg["dnd"]:
                 self.speaker.speak(self.persona.say("claude_needs"))
         elif s.state == "working":

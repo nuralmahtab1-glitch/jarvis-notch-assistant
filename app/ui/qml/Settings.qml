@@ -167,6 +167,13 @@ Window {
                     SRow { title: "Claude Code"; desc: "Shows what Claude is doing and lets you approve actions from the notch. Your own hooks are never touched."
                         Btn { label: sc.claudeConnected ? "Disconnect" : "Connect"; kind: sc.claudeConnected ? "danger" : "primary"
                             onClicked: sc.claudeConnected ? sc.disconnectClaude() : sc.connectClaude() } }
+                    SRow { title: "Claude Code on the web"; desc: "See what Claude is doing on claude.ai/code. Needs the Jarvis browser extension (in the extension folder). Only a state and a short label are sent, never your conversation."
+                        Switch2 { checked: win.v.claude_web; onToggled: sc.set("claude_web", on) } }
+                    SRow { visible: win.v.claude_web; title: "Pairing code"; desc: "Paste this into the extension's options page. Regenerate it any time to lock a browser out."
+                        Row { spacing: 10
+                            Rectangle { width: 130; height: 36; radius: 10; color: "#fff"; border.color: "#CFCFD8"
+                                Text { anchors.centerIn: parent; text: sc.pairCode; font.family: "Consolas"; font.pixelSize: 16; font.weight: Font.DemiBold; color: win.ink } }
+                            Btn { label: "New code"; onClicked: sc.regenPairCode() } } }
                     SRow { title: "Approval timeout"; desc: "If you don't answer, Claude Code's own prompt appears. Nothing is ever auto-approved."
                         Slid { from: 5; to: 120; step: 5; value: win.v.claude_approval_timeout; suffix: " s"; onMoved: sc.set("claude_approval_timeout", v) } }
                     SRow { title: "Hide commands and file names"; desc: "Show only “Running a command” instead of the command itself."

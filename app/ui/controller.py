@@ -70,6 +70,7 @@ class NotchController(QObject):
                        "lyrics": ["City lights on the glass", "Radio turned down low", "Nowhere left to be"]}
         self._controls = {"wifi": True, "bluetooth": True, "airplane": False, "volume": 55, "muted": False,
                           "brightness": 70, "battery": 86, "plugged": False, "power": "balanced", "awake": False, "dnd": False, "msg": ""}
+        self._needs_buttons = True      # Approve/Deny only make sense for terminal sessions, not the browser extension
         self._busy_until = 0.0     # user/assistant interaction in progress: do not auto-sleep
         self._demo = QTimer(self); self._demo.timeout.connect(self._next_demo); self._demo_i = 0
         self._poll = QTimer(self); self._poll.setInterval(33); self._poll.timeout.connect(self._tick); self._poll.start()
@@ -102,6 +103,7 @@ class NotchController(QObject):
     focusFrac = Property(float, lambda s: max(0.0, s._focus_left) / max(1, s._focus_total), notify=changed)
     level = Property(float, lambda s: s._level, notify=changed)
     music = Property("QVariantMap", lambda s: s._music, notify=changed)
+    needsButtons = Property(bool, lambda s: s._needs_buttons, notify=changed)
     controls = Property("QVariantMap", lambda s: s._controls, notify=changed)
     appName = Property(str, lambda s: config.APP_NAME, constant=True)
     credit = Property(str, lambda s: config.CREDIT, constant=True)
@@ -138,6 +140,11 @@ class NotchController(QObject):
         self._external_focus = True
         self._focus_left, self._focus_total = left, total
         self.changed.emit()
+
+    def setNeedsButtons(self, on: bool):
+        if self._needs_buttons != on:
+            self._needs_buttons = on
+            self.changed.emit()
 
     def setControls(self, c: dict):
         self._controls = {**self._controls, **c}

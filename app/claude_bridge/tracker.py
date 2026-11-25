@@ -71,6 +71,10 @@ class Session:
     summary: str = ""
     duration: float = 0.0
     permission_mode: str = ""
+    source: str = "code"         # "code" (terminal / VS Code hooks) or "web" (browser extension)
+
+
+WEB_STALE_SECONDS = 90           # a web tab that stops reporting is treated as closed
 
 
 def fmt_duration(sec: float) -> str:
@@ -189,9 +193,46 @@ class Tracker:
             return True
 
     # ---------------- views ----------------
+    def handle_web(self, ev: dict) -> None:
+        """An event from the browser extension: {state, tab, action, title}. Never contains conversation text."""
+        sid = "web:" + ev["tab"]
+        with self._lock:
+            if ev["state"] == "unavailable":              # the page does not look like Claude Code: show nothing, not a guess
+                self.sessions.pop(sid, None)
+            else:
+                s = self.sessions.setdefault(sid, Session(id=sid, source="web", project="Claude on the web"))
+                prev, now = s.state, time.time()
+                s.updated, s.source = now, "web"
+                if ev["state"] == "working":
+                    if prev != "working":
+                        s.started = now
+                    s.state, s.last_action = "working", ev["action"] or "Working"
+                elif ev["state"] == "needs_you":
+                    s.state, s.last_action = "needs_you", ev["action"] or "Waiting for your OK in the browser"
+                elif ev["state"] == "done":
+                    if prev == "working":                 # only a real working -> done transition counts as finishing
+                        s.duration = now - s.started if s.started else 0.0
+                        s.state, s.summary = "done", ""
+                        self.history.insert(0, {"project": s.project, "duration": s.duration, "result": "done", "summary": "", "at": now})
+                        del self.history[20:]
+                else:                                      # idle
+                    if prev in ("working", "needs_you"):
+                        s.state = "idle"
+                    elif prev == "done":
+                        pass                               # keep showing "finished" until you dismiss it
+                    else:
+                        s.state = "idle"
+        self.on_update()
+
+    def _drop_stale_web(self) -> None:
+        cutoff = time.time() - WEB_STALE_SECONDS
+        for sid in [k for k, v in self.sessions.items() if v.source == "web" and v.updated < cutoff]:
+            del self.sessions[sid]
+
     def urgent(self) -> Session | None:
         order = {"needs_you": 0, "error": 1, "working": 2, "done": 3, "idle": 4}
         with self._lock:
+            self._drop_stale_web()
             live = sorted(self.sessions.values(), key=lambda x: (order.get(x.state, 9), -x.updated))
             return live[0] if live and live[0].state != "idle" else None
 
@@ -200,13 +241,14 @@ class Tracker:
         if not s:
             return "Claude is not running anything right now."
         el = fmt_duration(time.time() - s.started) if s.started else ""
+        where = "on the web" if s.source == "web" else f"in {s.project}"
         if s.state == "working":
-            return f"Claude is {s.last_action[:1].lower() + s.last_action[1:]} in {s.project}, {el} in."
+            return f"Claude is {s.last_action[:1].lower() + s.last_action[1:]} {where}, {el} in."
         if s.state == "needs_you":
-            return f"Claude needs your permission in {s.project}."
+            return f"Claude {where} needs your permission" + (", in the browser." if s.source == "web" else ".")
         if s.state == "done":
-            return f"Claude finished in {s.project} after {fmt_duration(s.duration)}. {s.summary}"
-        return f"Claude hit an error in {s.project}."
+            return f"Claude finished {where} after {fmt_duration(s.duration)}. {s.summary}".strip()
+        return f"Claude hit an error {where}."
 
 
 class Bridge:

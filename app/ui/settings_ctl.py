@@ -106,7 +106,7 @@ class SettingsController(QObject):
     def _validate(self, key, v):
         try:
             if key in ("wake_word", "dnd", "greeting", "claude_bridge", "claude_hide_details",
-                       "claude_quiet_when_focused", "lyrics", "shelf_enabled", "awake_display", "awake_claude", "awake_focus", "speak_done", "speak_needs", "speak_error"):
+                       "claude_quiet_when_focused", "claude_web", "lyrics", "shelf_enabled", "awake_display", "awake_claude", "awake_focus", "speak_done", "speak_needs", "speak_error"):
                 return bool(v)
             if key == "address":
                 v = str(v).strip()[:40]
@@ -184,6 +184,8 @@ class SettingsController(QObject):
             self.hooks["lyrics"](v)
         elif key == "awake_display" and a.awake.active:
             a.set_keep_awake(True, display=v, minutes=a.awake.remaining() / 60 if a.awake.remaining() else None)
+        elif key == "claude_web" and "web" in self.hooks:
+            self.hooks["web"](v)
         elif key == "weather_units" and "units" in self.hooks:
             self.hooks["units"]()
         elif key == "shelf_enabled" and "shelf" in self.hooks:
@@ -262,6 +264,21 @@ class SettingsController(QObject):
         if "weather_city" in self.hooks:
             self.hooks["weather_city"](city.strip())
         self._say(f"Looking up {city.strip()}..." if city.strip() else "Weather turned off.")
+
+    @Property(str, notify=changed)
+    def pairCode(self) -> str:
+        """The code you paste into the browser extension (created the first time it is needed)."""
+        from app.claude_bridge.web import new_pair_code
+        if not self.cfg["web_pair_code"]:
+            self.cfg.set("web_pair_code", new_pair_code())
+        return self.cfg["web_pair_code"]
+
+    @Slot()
+    def regenPairCode(self):
+        """A new code: the old one stops working, so a browser you no longer trust is locked out."""
+        from app.claude_bridge.web import new_pair_code
+        self.cfg.set("web_pair_code", new_pair_code())
+        self._say("New pairing code created. Paste it into the extension again.")
 
     @Slot()
     def openPowerSettings(self):

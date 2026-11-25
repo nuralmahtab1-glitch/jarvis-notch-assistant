@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Jarvis for Claude Code on the web",
+  "version": "0.1.0",
+  "description": "Shows what Claude Code is doing on claude.ai/code in your Jarvis notch. Only a state and a short label are sent to Jarvis on this PC, never your conversation.",
+  "permissions": ["storage"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/code*", "https://claude.ai/code/*"],
+      "js": ["selectors.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html",
+  "action": { "default_title": "Jarvis for Claude Code on the web", "default_popup": "popup.html" },
+  "icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+}

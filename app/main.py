@@ -225,6 +225,26 @@ def main() -> int:
         assistant.apps = pins
         assistant.widgets = widgets_ctl
         assistant.prompter = prompter_ctl
+        # --- Claude Code on the web: a local endpoint that only the paired browser extension can talk to ---
+        web_ref = {"w": None}
+
+        def set_web(on: bool):
+            if tracker is None:
+                return
+            from app.claude_bridge.web import WebBridge, new_pair_code
+            if on and web_ref["w"] is None:
+                if not settings["web_pair_code"]:
+                    settings.set("web_pair_code", new_pair_code())
+                web_ref["w"] = WebBridge(tracker, lambda: settings["web_pair_code"])
+                if not web_ref["w"].start():
+                    print("[web] could not open a local port")
+                    web_ref["w"] = None
+            elif not on and web_ref["w"] is not None:
+                web_ref["w"].stop()
+                web_ref["w"] = None
+        hooks["web"] = set_web
+        set_web(bool(settings["claude_web"]))
+        app.aboutToQuit.connect(lambda: set_web(False))
         hooks["weather_city"] = widgets_ctl.set_city
         hooks["units"] = widgets_ctl.units_changed
         if settings["onboarded"] and speaker and not args.say:

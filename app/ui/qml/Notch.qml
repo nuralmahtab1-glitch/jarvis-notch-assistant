@@ -264,7 +264,7 @@ Window {
                 Pill { label: "Dismiss"; fg: "#000000"; bg: th.good; onClicked: notch.act("dismiss") }
             }
             Row {
-                visible: win.mode === "confirm" || win.mode === "claudeNeeds"
+                visible: win.mode === "confirm" || (win.mode === "claudeNeeds" && notch.needsButtons)
                 anchors.right: parent.right; anchors.rightMargin: th.flare + 18
                 anchors.bottom: parent.bottom; anchors.bottomMargin: 12
                 spacing: 8

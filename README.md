@@ -80,6 +80,21 @@ file up first, keeps your own hooks, and tags its entries so **Disconnect** remo
 - Hooks call a tiny stdlib-only helper (`app/claude_bridge/hook.py`) that talks to a loopback-only, token-protected
   local server. If Jarvis is not running the helper exits silently and instantly.
 
+## Claude Code on the web (browser extension)
+
+Jarvis can show what Claude Code is doing on claude.ai/code. Load the `extension` folder in Chrome or Edge
+(Extensions -> Developer mode -> Load unpacked), switch on **Claude Code on the web** in Jarvis Settings, copy the
+pairing code into the extension's options page and press Test connection.
+
+- Only a state (working / waiting for you / finished) and a fixed label go to Jarvis, on this PC only (127.0.0.1).
+  Never your messages, code or the page title. Web pages cannot talk to Jarvis; only the paired extension can.
+- Approving still happens in the browser: Jarvis tells you it is waiting, it has no Approve button for web sessions.
+- **Honest limits:** detection reads claude.ai's page layout, which I could not test against the real signed-in site.
+  It was tested against mock pages in a real Chrome. If claude.ai changes, update `extension/selectors.js` (the only
+  file that knows the layout); "Check this page" in the options tells you if the page is recognised. If the page is
+  not recognised, Jarvis shows nothing rather than guessing. Loading it as a real extension was not tested because
+  current Chrome/Edge no longer allow that from the command line.
+
 ## Menu and teleprompter
 
 The last tab icon opens the **Menu**: your favourite sites (edit them in Settings; only plain web addresses are ever
