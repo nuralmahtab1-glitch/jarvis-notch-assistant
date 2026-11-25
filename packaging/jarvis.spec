@@ -20,6 +20,7 @@ hiddenimports += ["win32com", "win32com.client", "pythoncom", "pywintypes"]
 
 datas += [
     (os.path.join(ROOT, "app", "ui", "qml"), os.path.join("app", "ui", "qml")),
+    (os.path.join(ROOT, "extension"), "extension"),
     (os.path.join(ROOT, "models", "piper"), os.path.join("models", "piper")),
     (os.path.join(ROOT, "LICENSE"), "."),
     (os.path.join(ROOT, "README.md"), "."),

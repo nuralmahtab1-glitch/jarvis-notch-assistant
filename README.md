@@ -88,7 +88,7 @@ Not built: pulling models by name from Ollama, and cloud providers with API keys
 
 ## Claude Code on the web (browser extension)
 
-Jarvis can show what Claude Code is doing on claude.ai/code. Load the `extension` folder in Chrome or Edge
+Jarvis can show what Claude Code is doing on claude.ai/code. Load the `extension` folder (in the install folder under `_internal\extension`, or in the project) in Chrome or Edge
 (Extensions -> Developer mode -> Load unpacked), switch on **Claude Code on the web** in Jarvis Settings, copy the
 pairing code into the extension's options page and press Test connection.
 
