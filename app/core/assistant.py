@@ -14,7 +14,10 @@ from app.tools import dictation
 from app.tools.intents import CAPABILITIES, Intent, parse
 from app.ui.controller import NotchController
 from app.winio import system as win
+from app.core import widgets as wd
 from app.winio import controls as qs
+from app.winio.awake import KeepAwake
+from app.winio.claude_proc import ClaudeActivity
 from app.claude_bridge.tracker import TERMINAL_PROCS, Tracker, fmt_duration
 
 
@@ -43,8 +46,16 @@ class Assistant(QObject):
         self._focus_total = 0
         self._focus_label = "Focus"
         self._claude_seen: dict[str, str] = {}
+        self.widgets = None                # set by main: clocks/weather
         self.apps = None                   # set by main: the pinned apps (voice 'open <app>')
         self.shelf = None                  # set by main: the Shelf controller
+        self.awake = KeepAwake()
+        self.claude_activity = ClaudeActivity()
+        self._claude_proc_active = False
+        self._auto_awake = False
+        self._awake_idle_since = 0.0
+        self._lid_note_said = False
+        self.on_awake_changed = lambda on: None     # main hooks the tray checkbox here
         self.qs = qs                       # quick-settings backend (swappable in tests)
         self._ctl_tick = 0
         self._brightness_lock = threading.Lock()
@@ -75,7 +86,7 @@ class Assistant(QObject):
         m = self.speak_mode
         return m == "always" or (m == "voice" and src in ("key", "wake"))
 
-    CARD_MODES = ("todo", "volume", "focus", "music", "controls", "shelf", "apps")
+    CARD_MODES = ("todo", "volume", "focus", "music", "controls", "shelf", "apps", "widgets")
 
     def say(self, text: str, src: str = "key", mode: str = "done", hold: float = 2.6):
         """Show the reply in the notch and speak it if the interaction was by voice.
@@ -312,6 +323,19 @@ class Assistant(QObject):
                     if hit:
                         return f"Opening {hit}."
                 return f"Opening {a['name']}." if win.open_app(a["name"]) else f"I could not open {a['name']}."
+            if it.name == "weather":
+                if not self.widgets:
+                    return "I have no weather source."
+                self.widgets.weather_async(lambda sentence: self.say(sentence, src, hold=5))
+                return None
+            if it.name == "time_in":
+                out = wd.time_in(a["city"], wd.parse_clocks(self.cfg["clocks"]))
+                return out or f"I do not know the time zone for {a['city']}."
+            if it.name == "widgets_open":
+                self.ctl.wake()
+                if self.widgets:
+                    self.widgets.opened()
+                self.ctl.setMode("widgets"); return ""
             if it.name == "apps_open":
                 self.ctl.wake(); self.ctl.setMode("apps"); return ""
             if it.name == "open_website":
@@ -329,6 +353,8 @@ class Assistant(QObject):
             if it.name == "night_light_toggle":
                 self.qs.open_settings_page("nightlight")
                 return "Windows does not let apps switch night light, so I opened its settings."
+            if it.name == "keep_awake":
+                return self.voice_keep_awake(a.get("on", True), a.get("minutes"), a.get("display"))
             if it.name == "shelf_open":
                 self.ctl.wake()
                 if self.shelf:
@@ -396,6 +422,7 @@ class Assistant(QObject):
             if self.speaker and self.speak_mode != "off":
                 self.speaker.speak(f"Reminder: {r['text']}.")
             self._last_reminder = r
+        self._awake_tick(now)
         if self.ctl.mode == "controls":
             self.ctl.keepAwake(5)
             self._ctl_tick += 1
@@ -427,6 +454,8 @@ class Assistant(QObject):
         elif name in ("ctl_wifi", "ctl_bluetooth", "ctl_airplane"): self.toggle_quick(name[4:])
         elif name.startswith("ctl_page_"): self.qs.open_settings_page(name[9:])
         elif name == "ctl_mute": self.on_control("mute", 0)
+        elif name == "ctl_awake": self.set_keep_awake(not self.awake.active, say=False)
+        elif name == "ctl_dnd": self.toggle_dnd_from_panel()
         elif name == "ctl_screenshot": self.take_screenshot_from_panel()
         elif name == "focus_stop": self.stop_focus()
         elif name == "focus_break": self.start_focus(5, label="Break")
@@ -670,6 +699,7 @@ class Assistant(QObject):
                 print("[controls]", e)
                 return
             snap["brightness"] = snap["brightness"] if snap["brightness"] is not None else -1
+            snap["awake"], snap["dnd"] = self.awake.active, bool(self.cfg["dnd"])
             self.ui(lambda: self.ctl.setControls({k: v for k, v in snap.items() if v is not None or k in ("wifi", "bluetooth")}))
         threading.Thread(target=work, daemon=True).start()
 
@@ -736,3 +766,59 @@ class Assistant(QObject):
                 print("[screenshot]", e)
                 self.ui(lambda: self._panel_msg("Could not take the screenshot"))
         threading.Thread(target=work, daemon=True).start()
+
+    # ------------------------------------------------------------------ keep awake (no sleep)
+    def set_keep_awake(self, on: bool, minutes: float | None = None, display: bool | None = None, say: bool = True, auto: bool = False):
+        """Ask Windows not to sleep (and, if configured, keep the screen on). Released automatically if Jarvis closes."""
+        if on:
+            self.awake.on(self.cfg["awake_display"] if display is None else display, minutes)
+        else:
+            self.awake.off()
+        self._auto_awake = bool(on and auto)
+        self.ctl.setControls({"awake": self.awake.active})
+        self.on_awake_changed(self.awake.active)
+
+    def voice_keep_awake(self, on: bool, minutes, display) -> str:
+        self.set_keep_awake(bool(on), minutes, display)
+        if not on:
+            return "Done. Your laptop may sleep normally again."
+        span = "until you tell me to stop" if not minutes else (f"for {minutes // 60} hour{'s' if minutes // 60 != 1 else ''}" if minutes % 60 == 0 and minutes >= 60 else f"for {minutes} minutes")
+        note = ""
+        if not self._lid_note_said:
+            self._lid_note_said = True
+            note = " Closing the lid will still put it to sleep, unless you change that in Windows."
+        return f"Keeping your laptop awake {span}.{note}"
+
+    def toggle_dnd_from_panel(self):
+        on = not self.cfg["dnd"]
+        self.cfg.set("dnd", on)
+        self.set_dnd(on)
+        if on:
+            QTimer.singleShot(0, lambda: self.ctl.setMode("sleeping"))
+        self.ctl.setControls({"dnd": on})
+
+    def _awake_tick(self, now: float):
+        """Called every second: end timed sessions, protect the battery, and handle the automatic modes."""
+        if self.awake.expired():
+            self.set_keep_awake(False)
+            self.say("Keep awake has finished. Your laptop may sleep again.", src="key", hold=4)
+            return
+        if int(now) % 20 == 0 and self.awake.active:                # low battery: never drain it flat on purpose
+            pct, plugged = win.battery()
+            if pct is not None and not plugged and pct <= 15:
+                self.set_keep_awake(False)
+                self.say(f"Battery is at {pct} percent, so I stopped keeping your laptop awake.", src="key", hold=6)
+                return
+        working = bool(self.tracker and any(s.state == "working" for s in self.tracker.sessions.values()))
+        if self.cfg["awake_claude"] and int(now) % 5 == 0:                 # no hooks needed: watch Claude Code's own process
+            self._claude_proc_active = self.claude_activity.active()
+        working = working or (self.cfg["awake_claude"] and self._claude_proc_active)
+        want = (self.cfg["awake_claude"] and working) or (self.cfg["awake_focus"] and bool(self._focus_end))
+        if want:
+            self._awake_idle_since = 0.0
+            if not self.awake.active:
+                self.set_keep_awake(True, auto=True)
+        elif self._auto_awake and self.awake.active:               # automatic hold: release after a short grace period
+            self._awake_idle_since = self._awake_idle_since or now
+            if now - self._awake_idle_since > 120:
+                self.set_keep_awake(False)

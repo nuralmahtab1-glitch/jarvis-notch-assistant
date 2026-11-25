@@ -1,5 +1,9 @@
 """Live UI check of the Shelf: real notch window, simulated mouse clicks and synthesized drag-and-drop events.
 Uses a stand-in clipboard and stand-in Ctrl+V, so it never touches your real clipboard or keystrokes."""
+import os as _os
+_os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")      # independent of your real screen and mouse
+_os.environ.setdefault("QT_QUICK_BACKEND", "software")
+
 import sys, tempfile, time
 from pathlib import Path
 sys.path.insert(0, ".")
@@ -38,7 +42,14 @@ from app.ui.apps_ctl import AppsController
 from app.store.db import Settings as _Set
 import tempfile as _tf
 _pins = PinnedApps(_Set(__import__("pathlib").Path(_tf.mkdtemp()) / "a.json"), {}, launcher=lambda t: None)
-eng.rootContext().setContextProperty("apps", AppsController(ctl, _pins))
+_apps_keepalive = AppsController(ctl, _pins)                          # keep a reference (Python would delete it)
+eng.rootContext().setContextProperty("apps", _apps_keepalive)
+from app.ui.widgets_ctl import WidgetsController as _WC
+from app.store.db import Store as _St, Settings as _Se
+import tempfile as _t2, pathlib as _p2
+_d2 = _p2.Path(_t2.mkdtemp())
+_wc_keepalive = _WC(_Se(_d2 / "w.json"), _St(_d2 / "w.db"))          # keep a reference: Python would otherwise delete it
+eng.rootContext().setContextProperty("widgets", _wc_keepalive)
 eng.load(QUrl.fromLocalFile("app/ui/qml/Notch.qml"))
 w = eng.rootObjects()[0]; qw = wrapInstance(getCppPointer(w)[0], QQuickWindow)
 results = []

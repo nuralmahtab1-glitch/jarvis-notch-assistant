@@ -80,6 +80,32 @@ file up first, keeps your own hooks, and tags its entries so **Disconnect** remo
 - Hooks call a tiny stdlib-only helper (`app/claude_bridge/hook.py`) that talks to a loopback-only, token-protected
   local server. If Jarvis is not running the helper exits silently and instantly.
 
+## Keep awake (stop the laptop sleeping)
+
+Three ways, all using Windows' own "do not sleep" request (no admin rights; Windows drops it by itself if Jarvis
+closes or crashes):
+- **Controls panel > Keep awake** tile, the tray's **Keep awake (no sleep)**, or by voice: "keep my laptop awake",
+  "keep it awake for two hours", "don't let it sleep", "stop keeping it awake" / "let it sleep".
+- **Automatic while Claude Code works** (on by default): Jarvis notices Claude Code is busy, either from its hooks or,
+  with no setup at all, by watching its process, and holds the laptop awake until 15 minutes after the last burst of
+  work. Turn it off in Settings. There is a matching option for focus sessions.
+- **Headless:** `Jarvis.exe --awake-only` holds awake with no window or microphone. Options: `--minutes 480`,
+  `--while-claude` (hold only while Claude Code is working, then exit), `--display` (also keep the screen on).
+  Stop it with `Jarvis.exe --awake-stop`.
+
+Safety: it lets go by itself when you are unplugged and the battery reaches **15%**, timed holds end on time, and
+the screen is allowed to turn off unless you ask for "keep the screen on too". **It cannot stop the lid from putting
+the laptop to sleep, or you choosing Sleep**: the lid action is a Windows power-plan setting (Settings > General has a
+button that opens it).
+
+## Widgets (clocks, weather, battery, tasks)
+
+The first tab icon opens world clocks (default London, New York, Tokyo; edit in Settings, for example
+`Dhaka=Asia/Dhaka`), the weather, battery and how many tasks are left. Weather uses the free **Open-Meteo** service:
+type a city in Settings and **only that city name** is sent, then its coordinates for the forecast. Nothing is guessed
+from your IP address, and with no city set nothing is sent at all. Voice: "what's the weather", "do I need an
+umbrella", "what time is it in Tokyo".
+
 ## Apps (a launcher in the notch)
 
 The grid icon opens your **pinned apps** (or say "show my apps"). The first time, it pins Explorer, Notepad,
@@ -174,7 +200,7 @@ now-playing + synced lyrics, tray menu, 17-step onboarding.
 ## Tests
 
 ```powershell
-.venv\Scripts\python.exe -m pytest tests -q     # 230 tests
+.venv\Scripts\python.exe -m pytest tests -q     # 320+ tests
 ```
 
 Live checks (need a real screen/speakers): `tests/live_winio_check.py`, `tests/live_voice_roundtrip.py`,

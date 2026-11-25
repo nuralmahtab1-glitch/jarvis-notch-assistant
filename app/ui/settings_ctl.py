@@ -106,7 +106,7 @@ class SettingsController(QObject):
     def _validate(self, key, v):
         try:
             if key in ("wake_word", "dnd", "greeting", "claude_bridge", "claude_hide_details",
-                       "claude_quiet_when_focused", "lyrics", "shelf_enabled", "speak_done", "speak_needs", "speak_error"):
+                       "claude_quiet_when_focused", "lyrics", "shelf_enabled", "awake_display", "awake_claude", "awake_focus", "speak_done", "speak_needs", "speak_error"):
                 return bool(v)
             if key == "address":
                 v = str(v).strip()[:40]
@@ -129,6 +129,16 @@ class SettingsController(QObject):
                     self._say("Command and Dictate need two different keys.")
                     return None
                 return v
+            if key == "weather_units":
+                return v if v in ("C", "F") else None
+            if key == "clocks":
+                from app.core.widgets import parse_clocks
+                raw = [p.strip() for p in (v.split(",") if isinstance(v, str) else list(v)) if p.strip()]
+                good = parse_clocks(raw)
+                if raw and not good:
+                    self._say("I did not recognise those places. Use the form London=Europe/London.")
+                    return None
+                return [f"{a}={b}" for a, b in good]
             if key == "stt_model":
                 return v if v in STT_CHOICES else None
             if key == "llm_model":
@@ -166,6 +176,10 @@ class SettingsController(QObject):
             self.hooks["wake"](v)
         elif key == "lyrics" and "lyrics" in self.hooks:
             self.hooks["lyrics"](v)
+        elif key == "awake_display" and a.awake.active:
+            a.set_keep_awake(True, display=v, minutes=a.awake.remaining() / 60 if a.awake.remaining() else None)
+        elif key == "weather_units" and "units" in self.hooks:
+            self.hooks["units"]()
         elif key == "shelf_enabled" and "shelf" in self.hooks:
             self.hooks["shelf"](v)
         elif key == "llm_model" and a.local:
@@ -234,6 +248,19 @@ class SettingsController(QObject):
         path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
         self._say(f"Saved to {path}")
         return str(path)
+
+    @Slot(str)
+    def setWeatherCity(self, city: str):
+        """Save the city you typed and look it up (only the name is sent)."""
+        self.cfg.set("weather_city", city.strip())
+        if "weather_city" in self.hooks:
+            self.hooks["weather_city"](city.strip())
+        self._say(f"Looking up {city.strip()}..." if city.strip() else "Weather turned off.")
+
+    @Slot()
+    def openPowerSettings(self):
+        from app.winio import controls
+        controls.open_settings_page("power")
 
     @Slot()
     def clearShelf(self):

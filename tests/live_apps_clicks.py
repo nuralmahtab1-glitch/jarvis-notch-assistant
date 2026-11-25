@@ -1,5 +1,9 @@
 """Live UI check of the Apps panel: real notch window, simulated clicks/hover, synthesized drag-and-drop.
 A stand-in launcher is used, so no program is ever started by this test."""
+import os as _os
+_os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")      # independent of your real screen and mouse
+_os.environ.setdefault("QT_QUICK_BACKEND", "software")
+
 import sys, tempfile, time
 from pathlib import Path
 sys.path.insert(0, ".")
@@ -34,6 +38,12 @@ shelf = ShelfController(ctl, clipboard=Clip())
 eng = QQmlApplicationEngine()
 for k, v in (("notch", ctl), ("shelf", shelf), ("apps", apps)):
     eng.rootContext().setContextProperty(k, v)
+from app.ui.widgets_ctl import WidgetsController as _WC
+from app.store.db import Store as _St, Settings as _Se
+import tempfile as _t2, pathlib as _p2
+_d2 = _p2.Path(_t2.mkdtemp())
+_wc_keepalive = _WC(_Se(_d2 / "w.json"), _St(_d2 / "w.db"))          # keep a reference: Python would otherwise delete it
+eng.rootContext().setContextProperty("widgets", _wc_keepalive)
 eng.load(QUrl.fromLocalFile("app/ui/qml/Notch.qml"))
 w = eng.rootObjects()[0]; qw = wrapInstance(getCppPointer(w)[0], QQuickWindow)
 results = []

@@ -12,6 +12,9 @@ if getattr(sys, "frozen", False) and (sys.stdout is None or sys.stderr is None):
     sys.stdout = sys.stderr = open(_log, "a", buffering=1, encoding="utf-8")
 
 # Headless maintenance commands: handled before the (slow) UI libraries are imported.
+if "--awake-only" in sys.argv or "--awake-stop" in sys.argv:
+    from app.awake_only import run as _awake_run
+    sys.exit(_awake_run(sys.argv))
 if "--disconnect-claude" in sys.argv:
     from app.claude_bridge import installer
     try:

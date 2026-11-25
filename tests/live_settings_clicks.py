@@ -1,4 +1,8 @@
 """Live UI check: open the real Settings window and click its controls with simulated mouse clicks."""
+import os as _os
+_os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")      # independent of your real screen and mouse
+_os.environ.setdefault("QT_QUICK_BACKEND", "software")
+
 import sys, tempfile, time
 from pathlib import Path
 sys.path.insert(0, ".")

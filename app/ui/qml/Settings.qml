@@ -93,6 +93,24 @@ Window {
                         Slid { from: 1; to: 60; step: 1; value: win.v.sleep_after_minutes; suffix: " min"; onMoved: sc.set("sleep_after_minutes", v) } }
                     SRow { title: "Do not disturb"; desc: "Stay asleep and silent. Reminders wait until you turn this off."
                         Switch2 { checked: win.v.dnd; onToggled: sc.set("dnd", on) } }
+                    SRow { title: "Weather city"; desc: win.v.weather_place !== "" ? "Showing: " + win.v.weather_place + ". Only the city name is sent, to Open-Meteo." : "Type a city for the Widgets weather. Only the name is sent, to Open-Meteo."
+                        Rectangle { width: 220; height: 36; radius: 10; color: "#fff"; border.color: cityIn.activeFocus ? win.accent : "#CFCFD8"
+                            TextInput { id: cityIn; anchors.fill: parent; anchors.margins: 10; text: win.v.weather_city; clip: true
+                                font.family: win.fontFam; font.pixelSize: 14; color: win.ink; onEditingFinished: sc.setWeatherCity(text) } } }
+                    SRow { title: "Temperature unit"; desc: ""
+                        Seg { options: ["C", "F"]; labels: ["Celsius", "Fahrenheit"]; current: win.v.weather_units; onPicked: sc.set("weather_units", value) } }
+                    SRow { title: "World clocks"; desc: "Up to four, like London=Europe/London, Tokyo=Asia/Tokyo."
+                        Rectangle { width: 320; height: 36; radius: 10; color: "#fff"; border.color: clkIn.activeFocus ? win.accent : "#CFCFD8"
+                            TextInput { id: clkIn; anchors.fill: parent; anchors.margins: 10; text: win.v.clocks.join(", "); clip: true
+                                font.family: win.fontFam; font.pixelSize: 13; color: win.ink; onEditingFinished: sc.set("clocks", text) } } }
+                    SRow { title: "Keep the screen on too"; desc: "When keeping the laptop awake, also stop the display from turning off."
+                        Switch2 { checked: win.v.awake_display; onToggled: sc.set("awake_display", on) } }
+                    SRow { title: "Stay awake while Claude Code works"; desc: "No sleeping mid-task. Released two minutes after Claude is idle."
+                        Switch2 { checked: win.v.awake_claude; onToggled: sc.set("awake_claude", on) } }
+                    SRow { title: "Stay awake during focus sessions"; desc: "Released when the session ends or you stop it."
+                        Switch2 { checked: win.v.awake_focus; onToggled: sc.set("awake_focus", on) } }
+                    SRow { title: "Lid and sleep settings"; desc: "Keep awake cannot stop the lid from sleeping the laptop. That is a Windows setting."
+                        Btn { label: "Open Windows settings"; onClicked: sc.openPowerSettings() } }
                     SRow { title: "Greeting"; desc: "A short hello the first time it starts each day."
                         Switch2 { checked: win.v.greeting; onToggled: sc.set("greeting", on) } }
                 }

@@ -37,7 +37,7 @@ Window {
 
     readonly property string mode: notch.mode
     readonly property bool isTiny: mode === "idle" || mode === "sleeping" || mode === "peek"
-    readonly property bool isPanel: mode === "expanded" || mode === "music" || mode === "focus" || mode === "todo" || mode === "controls" || mode === "shelf" || mode === "apps"
+    readonly property bool isPanel: mode === "expanded" || mode === "music" || mode === "focus" || mode === "todo" || mode === "controls" || mode === "shelf" || mode === "apps" || mode === "widgets"
     readonly property bool isCard: mode === "confirm" || mode === "claudeNeeds" || mode === "reminder" || mode === "claudeDone" || mode === "answer"
     readonly property bool isCompact: !isTiny && !isPanel && !isCard
     readonly property bool sleeping: mode === "sleeping"
@@ -305,7 +305,7 @@ Window {
                 Text { text: notch.clock; color: th.text3; anchors.verticalCenter: parent.verticalCenter
                     font.family: th.font; font.pixelSize: 11; font.features: { "tnum": 1 } }
                 TabIcon { glyph: ""; key: "timer"; onClicked: notch.setMode("focus") }
-                TabIcon { glyph: ""; key: "widgets"; onClicked: notch.setMode("todo") }
+                TabIcon { glyph: ""; key: "widgets"; onClicked: { widgets.opened(); notch.setMode("widgets") } }
                 TabIcon { glyph: ""; key: "shelf"; onClicked: { shelf.opened(); notch.setMode("shelf") } }
                 TabIcon { glyph: ""; key: "controls"; onClicked: notch.act("open_controls") }
                 TabIcon { glyph: ""; key: "apps"; onClicked: notch.setMode("apps") }
@@ -427,23 +427,27 @@ Window {
                             { k: "airplane", t: "Airplane", g: "", a: "ctl_airplane", page: false },
                             { k: "batterysaver", t: "Battery saver", g: "", a: "ctl_page_batterysaver", page: true },
                             { k: "nightlight", t: "Night light", g: "", a: "ctl_page_nightlight", page: true },
-                            { k: "accessibility", t: "Accessibility", g: "", a: "ctl_page_accessibility", page: true }
+                            { k: "accessibility", t: "Accessibility", g: "", a: "ctl_page_accessibility", page: true },
+                            { k: "awake", t: "Keep awake", g: "", a: "ctl_awake", page: false },
+                            { k: "dnd", t: "Quiet mode", g: "", a: "ctl_dnd", page: false },
+                            { k: "screenshot", t: "Screenshot", g: "", a: "ctl_screenshot", page: false, btn: true }
                         ]
                         delegate: Rectangle {
                             required property var modelData
-                            readonly property var st: modelData.page ? undefined : notch.controls[modelData.k]
-                            readonly property bool missing: !modelData.page && (st === null || st === undefined)
-                            readonly property bool on: !modelData.page && st === true
-                            width: 88; height: 66; radius: 16
+                            readonly property bool plain: modelData.page || modelData.btn === true          // shortcuts and buttons have no on/off state
+                            readonly property var st: plain ? undefined : notch.controls[modelData.k]
+                            readonly property bool missing: !plain && (st === null || st === undefined)
+                            readonly property bool on: !plain && st === true
+                            width: 88; height: 52; radius: 14
                             color: on ? th.accent : (tm.containsMouse && !missing ? "#24242A" : "#1A1A1F")
                             opacity: missing ? 0.35 : 1
                             Behavior on color { ColorAnimation { duration: 120 } }
                             scale: tm.pressed ? 0.96 : 1
                             Behavior on scale { NumberAnimation { duration: 80 } }
-                            Text { x: 12; y: 10; text: modelData.g; font.family: th.icons; font.pixelSize: 19; color: on ? "#001018" : th.text1 }
-                            Text { x: 12; y: 40; width: parent.width - 20; elide: Text.ElideRight; text: modelData.t
+                            Text { x: 12; y: 7; text: modelData.g; font.family: th.icons; font.pixelSize: 17; color: on ? "#001018" : th.text1 }
+                            Text { x: 12; y: 31; width: parent.width - 20; elide: Text.ElideRight; text: modelData.t
                                 font.family: th.font; font.pixelSize: 11; font.weight: Font.Medium; color: on ? "#001018" : th.text2 }
-                            Text { visible: modelData.page; anchors.right: parent.right; anchors.rightMargin: 10; y: 10
+                            Text { visible: modelData.page; anchors.right: parent.right; anchors.rightMargin: 10; y: 7
                                 text: "›"; color: th.text3; font.pixelSize: 16 }
                             MouseArea { id: tm; anchors.fill: parent; hoverEnabled: true; enabled: !missing; onClicked: notch.act(modelData.a) }
                         }
@@ -483,10 +487,9 @@ Window {
                                 MouseArea { anchors.fill: parent; onClicked: notch.setControl("power", index) } } } }
                 }
                 // screenshot + status line
-                Pill { x: th.flare + 20; y: 190; label: "  Screenshot"; fg: th.text1; bg: "#24242A"; onClicked: notch.act("ctl_screenshot") }
-                Text { x: th.flare + 20 + 134; y: 197; width: 340; elide: Text.ElideRight; text: notch.controls.msg; color: th.accent
+                Text { x: th.flare + 20; y: 208; width: 480; elide: Text.ElideRight; text: notch.controls.msg; color: th.accent
                     font.family: th.font; font.pixelSize: 12 }
-                Text { x: th.flare + 20; y: 236; text: "Wi-Fi and Bluetooth are real switches. Battery saver, night light and accessibility open their Windows pages."
+                Text { x: th.flare + 20; y: 238; text: "Wi-Fi, Bluetooth, Airplane, Keep awake and Do not disturb are real switches. Arrow tiles open their Windows page."
                     color: th.text3; font.family: th.font; font.pixelSize: 10 }
             }
 
@@ -615,6 +618,62 @@ Window {
                 Text { x: th.flare + 20; y: 222; width: 300; elide: Text.ElideRight; text: apps.message !== "" ? apps.message : "Drop a program or shortcut here to pin it."
                     color: apps.message !== "" ? th.accent : th.text3; font.family: th.font; font.pixelSize: 11 }
                 Pill { anchors.right: parent.right; anchors.rightMargin: th.flare + 20; y: 216; label: "Reset"; fg: th.text2; bg: "#1A1A1F"; onClicked: apps.reset() }
+            }
+
+            // ---- WIDGETS (world clocks, weather, battery, tasks) ----
+            Item {
+                visible: win.mode === "widgets"; anchors.fill: parent
+                // world clocks
+                Column {
+                    x: th.flare + 20; y: 20; spacing: 6; width: 250
+                    Text { text: "WORLD CLOCKS"; color: th.text3; font.family: th.font; font.pixelSize: 10; font.weight: Font.Bold }
+                    Repeater {
+                        model: widgets.clocks
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: 250; height: 52; radius: 14; color: "#141418"
+                            Rectangle { x: 14; y: 20; width: 8; height: 8; radius: 4; color: modelData.night ? "#6C7BFF" : th.moon }
+                            Column { x: 32; y: 9; width: 130; spacing: 1
+                                Text { width: parent.width; elide: Text.ElideRight; text: modelData.city; color: th.text1
+                                    font.family: th.font; font.pixelSize: 13; font.weight: Font.DemiBold }
+                                Text { text: modelData.day; color: modelData.day === "Today" ? th.text3 : th.warn
+                                    font.family: th.font; font.pixelSize: 10 } }
+                            Text { anchors.right: parent.right; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter
+                                text: modelData.time; color: th.text1; font.family: th.font; font.pixelSize: 22; font.weight: Font.DemiBold
+                                font.features: { "tnum": 1 } }
+                        }
+                    }
+                }
+                // weather
+                Rectangle {
+                    x: 300; y: 40; width: 232; height: 112; radius: 18; color: "#141418"
+                    Text { visible: widgets.weather.ok; x: 16; y: 14; text: widgets.weather.glyph || ""; font.family: "Segoe UI Emoji"; font.pixelSize: 36 }
+                    Column { visible: widgets.weather.ok; x: 78; y: 12; spacing: 0
+                        Text { text: widgets.weather.ok ? widgets.weather.temp + "°" + widgets.weather.unit : ""; color: th.text1; font.family: th.font
+                            font.pixelSize: 34; font.weight: Font.DemiBold }
+                        Text { text: widgets.weather.text || ""; color: th.text2; font.family: th.font; font.pixelSize: 12 } }
+                    Text { visible: widgets.weather.ok; x: 16; y: 84; width: parent.width - 32; elide: Text.ElideRight
+                        text: widgets.weather.ok ? widgets.weather.place + "   H " + widgets.weather.high + "°  L " + widgets.weather.low + "°" : ""
+                        color: th.text3; font.family: th.font; font.pixelSize: 11 }
+                    Text { visible: !widgets.weather.ok; anchors.centerIn: parent; width: parent.width - 36; horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap; text: widgets.weather.status; color: th.text3; font.family: th.font; font.pixelSize: 12 }
+                }
+                // quick stats
+                Row {
+                    x: 300; y: 164; spacing: 8
+                    Rectangle { width: 112; height: 56; radius: 14; color: "#141418"
+                        Text { x: 12; y: 8; text: widgets.battery >= 0 ? widgets.battery + "%" : "--"; color: th.text1; font.family: th.font
+                            font.pixelSize: 19; font.weight: Font.DemiBold }
+                        Text { x: 12; y: 34; text: widgets.battery < 0 ? "No battery" : (widgets.plugged ? "⚡ Charging" : "Battery"); color: widgets.plugged ? th.good : th.text3
+                            font.family: th.font; font.pixelSize: 10 } }
+                    Rectangle { width: 112; height: 56; radius: 14; color: "#141418"
+                        Text { x: 12; y: 8; text: widgets.tasksLeft; color: th.text1; font.family: th.font; font.pixelSize: 19; font.weight: Font.DemiBold }
+                        Text { x: 12; y: 34; text: widgets.tasksLeft === 1 ? "task left" : "tasks left"; color: th.text3; font.family: th.font; font.pixelSize: 10 }
+                        MouseArea { anchors.fill: parent; onClicked: notch.setMode("todo") } }
+                }
+                Text { x: th.flare + 20; y: 232; width: parent.width - 2 * th.flare - 40; elide: Text.ElideRight
+                    text: widgets.nextReminder !== "" ? "Next reminder: " + widgets.nextReminder : "No reminders coming up."
+                    color: th.text3; font.family: th.font; font.pixelSize: 11 }
             }
 
             // ---- MUSIC ----

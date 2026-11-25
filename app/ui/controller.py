@@ -26,13 +26,13 @@ DEFAULT_TEXT = {
 }
 MODES = ["idle", "sleeping", "expanded", "listening", "hearing", "working", "done", "recording",
          "speaking", "confirm", "volume", "reminder", "music", "focus", "todo",
-         "claudeWorking", "claudeNeeds", "claudeDone", "claudeError", "controls", "shelf", "apps"]
+         "claudeWorking", "claudeNeeds", "claudeDone", "claudeError", "controls", "shelf", "apps", "widgets"]
 SIZES = {  # width, height
     "idle": (180, 36), "sleeping": (180, 36), "peek": (210, 42), "expanded": (560, 150),
     "listening": (300, 44), "recording": (300, 44), "hearing": (400, 44), "working": (300, 44),
     "done": (250, 44), "speaking": (340, 44), "confirm": (450, 96), "volume": (300, 44),
     "reminder": (400, 76), "music": (560, 176), "focus": (560, 150), "todo": (560, 176),
-    "claudeWorking": (440, 44), "claudeNeeds": (500, 96), "claudeDone": (500, 76), "claudeError": (400, 44), "answer": (520, 92), "controls": (560, 268), "shelf": (560, 262), "apps": (560, 264),
+    "claudeWorking": (440, 44), "claudeNeeds": (500, 96), "claudeDone": (500, 76), "claudeError": (400, 44), "answer": (520, 92), "controls": (560, 268), "shelf": (560, 262), "apps": (560, 264), "widgets": (560, 262),
 }
 DEMO_TEXT = {
     "hearing": ("Remind me to water the plants at six", ""), "speaking": ("Certainly.", ""),
@@ -69,7 +69,7 @@ class NotchController(QObject):
         self._music = {"title": "Late Night Drive", "artist": "Nova Park", "frac": 0.32,
                        "lyrics": ["City lights on the glass", "Radio turned down low", "Nowhere left to be"]}
         self._controls = {"wifi": True, "bluetooth": True, "airplane": False, "volume": 55, "muted": False,
-                          "brightness": 70, "battery": 86, "plugged": False, "power": "balanced", "msg": ""}
+                          "brightness": 70, "battery": 86, "plugged": False, "power": "balanced", "awake": False, "dnd": False, "msg": ""}
         self._busy_until = 0.0     # user/assistant interaction in progress: do not auto-sleep
         self._demo = QTimer(self); self._demo.timeout.connect(self._next_demo); self._demo_i = 0
         self._poll = QTimer(self); self._poll.setInterval(33); self._poll.timeout.connect(self._tick); self._poll.start()
@@ -176,11 +176,11 @@ class NotchController(QObject):
             self._last_active = time.monotonic()
             if self._mode in ("idle", "sleeping", "peek"):
                 self.setMode("expanded")
-        elif self._mode in ("expanded", "controls", "shelf", "apps"):
+        elif self._mode in ("expanded", "controls", "shelf", "apps", "widgets"):
             self._collapse.start()
 
     def _do_collapse(self):
-        if self._mode in ("expanded", "controls", "shelf", "apps"):
+        if self._mode in ("expanded", "controls", "shelf", "apps", "widgets"):
             self.setMode("idle")
 
     @Slot(str)

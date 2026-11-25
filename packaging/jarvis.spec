@@ -8,7 +8,7 @@ datas, binaries, hiddenimports = [], [], []
 
 # packages that carry data files, models or native libraries
 for pkg in ("faster_whisper", "ctranslate2", "onnxruntime", "openwakeword", "piper", "sounddevice",
-            "comtypes", "pycaw", "tokenizers", "av", "huggingface_hub", "onnx_asr"):
+            "comtypes", "pycaw", "tokenizers", "av", "huggingface_hub", "onnx_asr", "tzdata"):
     try:
         d, b, h = collect_all(pkg)
         datas += d; binaries += b; hiddenimports += h

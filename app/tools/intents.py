@@ -76,17 +76,49 @@ def parse_when(text: str, now: datetime | None = None):
     return None, t
 
 
+AWAKE_OFF = re.compile(r"(stop|quit|end|cancel|turn off|disable) (keeping|the keep|keep) ?(it |my \w+ |the \w+ )?(awake|alive)|allow (it |my \w+ |the \w+ )?(to )?sleep|"
+                       r"let (it|my \w+|the \w+) sleep|(go back to|resume) normal sleep|no more keep awake", re.I)
+AWAKE_ON = re.compile(r"\bkeep\b.{0,25}\bawake\b|\bstay awake\b|don'?t (let|make) .{0,25}sleep|prevent .{0,20}sleep|\bcaffeinate\b|keep (the |my )?screen on", re.I)
+NO_SLEEP = re.compile(r"(don'?t|do not|never|stop) (let|make|allow) .{0,25}sleep", re.I)
+NUM = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "eight": 8, "ten": 10, "twelve": 12,
+       "fifteen": 15, "twenty": 20, "thirty": 30, "forty five": 45, "forty-five": 45}
+
+
+def awake_minutes(t: str) -> int | None:
+    """'for two hours' -> 120, 'for 45 minutes' -> 45, 'for half an hour' -> 30."""
+    if re.search(r"half an hour", t):
+        return 30
+    m = re.search(r"for (\d+(?:\.\d+)?|an?|one|two|three|four|five|six|eight|ten|twelve|fifteen|twenty|thirty|forty five|forty-five) ?(hours?|hrs?|minutes?|mins?)", t)
+    if not m:
+        return None
+    n = float(m.group(1)) if re.fullmatch(r"\d+(\.\d+)?", m.group(1)) else NUM[m.group(1)]
+    return int(max(1, min(24 * 60, n * (60 if m.group(2).startswith("h") else 1))))
+
+
 def parse(text: str, now: datetime | None = None) -> Intent | None:
     t = _norm(text)
     if not t:
         return None
 
+    if NO_SLEEP.search(t):                      # "don't let it sleep" must win over "let it sleep"
+        return Intent("keep_awake", {"on": True, "minutes": awake_minutes(t), "display": None})
+    if AWAKE_OFF.search(t):
+        return Intent("keep_awake", {"on": False, "minutes": None})
+    if AWAKE_ON.search(t):
+        return Intent("keep_awake", {"on": True, "minutes": awake_minutes(t), "display": bool(re.search(r"screen", t)) or None})
     if re.search(r"\b(go to sleep|goodnight|good night|sleep now)\b", t):
         return Intent("go_to_sleep")
     if re.search(r"^(stop|cancel|never ?mind|be quiet|shut up|quiet)$", t):
         return Intent("cancel")
     if re.search(r"what can you do|what do you do|help me|what are your (commands|features)", t):
         return Intent("what_can_you_do")
+    m = re.search(r"(?:what time is it|what'?s the time|what is the time|the time|time)\s+in\s+(.+)$", t)
+    if m:
+        return Intent("time_in", {"city": m.group(1).strip()})
+    if re.search(r"\b(weather|forecast)\b|is it (raining|snowing|cold|hot|sunny|warm) |do i need (an )?umbrella|how (hot|cold) is it", t + " "):
+        return Intent("weather")
+    if re.search(r"(open|show|bring up) (my |the )?(widgets|dashboard|world clocks|clocks)\b", t):
+        return Intent("widgets_open")
     if re.search(r"what('?s| is) the time|what time is it|tell me the time|^the time$", t):
         return Intent("time")
     if re.search(r"what('?s| is) (the )?(date|day)( today)?|what day is it|today'?s date", t):

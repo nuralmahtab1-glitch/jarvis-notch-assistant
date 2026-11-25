@@ -30,6 +30,12 @@ apps = AppsController(ctl, pins)
 eng = QQmlApplicationEngine()
 for k, v in (("notch", ctl), ("shelf", shelf), ("apps", apps)):
     eng.rootContext().setContextProperty(k, v)
+from app.ui.widgets_ctl import WidgetsController as _WC
+from app.store.db import Store as _St, Settings as _Se
+import tempfile as _t2, pathlib as _p2
+_d2 = _p2.Path(_t2.mkdtemp())
+_wc_keepalive = _WC(_Se(_d2 / "w.json"), _St(_d2 / "w.db"))          # keep a reference: Python would otherwise delete it
+eng.rootContext().setContextProperty("widgets", _wc_keepalive)
 eng.load(QUrl.fromLocalFile("app/ui/qml/Notch.qml"))
 w = eng.rootObjects()[0]; qw = wrapInstance(getCppPointer(w)[0], QQuickWindow)
 
@@ -41,7 +47,7 @@ shelf.shelf.add_text(LONG); shelf.shelf.add_text(LONG_NOSPACE); shelf.changed.em
 pins.items = [AppEntry(LONG_NOSPACE, "x"), AppEntry(LONG, "y")] * 4
 apps.changed.emit()
 
-CASES = [("music", None), ("todo", None), ("shelf", None), ("apps", None), ("answer", (LONG, LONG)), ("confirm", (LONG, LONG)),
+CASES = [("widgets", None), ("music", None), ("todo", None), ("shelf", None), ("apps", None), ("answer", (LONG, LONG)), ("confirm", (LONG, LONG)),
          ("reminder", (LONG, LONG)), ("claudeNeeds", (LONG, LONG)), ("claudeDone", (LONG, LONG)), ("claudeWorking", (LONG, LONG)),
          ("claudeError", (LONG, LONG)), ("hearing", (LONG, "")), ("speaking", (LONG, "")), ("working", (LONG, "")),
          ("done", (LONG, "")), ("listening", (LONG, "")), ("volume", (LONG, "")), ("expanded", (LONG, LONG))]
@@ -72,8 +78,16 @@ for mode, text in CASES:
         for x in range(0, img.width(), 2):
             if (x < left or x > right or y > bottom) and (img.pixelColor(x, y).alpha() > 8):
                 stray += 1
-    print(("PASS" if stray == 0 else "FAIL"), f"{mode:14s}", "" if stray == 0 else f"{stray} stray pixels outside the box")
-    if stray:
+    # ...and the box itself must really be drawn (otherwise "nothing outside" would pass for a blank window)
+    filled = total = 0
+    for y in range(int(6 * dpr), int((bh - 6) * dpr), 3):
+        for x in range(int((x0 + 30) * dpr), int((x0 + bw - 30) * dpr), 3):
+            total += 1
+            filled += img.pixelColor(x, y).alpha() > 200
+    drawn = filled / max(1, total)
+    ok = stray == 0 and drawn > 0.6
+    print(("PASS" if ok else "FAIL"), f"{mode:14s}", f"box {drawn:.0%} filled" + ("" if stray == 0 else f", {stray} stray pixels outside the box"))
+    if not ok:
         bad.append(mode)
 print(f"\n{len(CASES) - len(bad)}/{len(CASES)} states keep long text inside the box" + (f"   OVERFLOW IN: {bad}" if bad else ""))
 sys.exit(1 if bad else 0)

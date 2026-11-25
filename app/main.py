@@ -67,12 +67,24 @@ def main() -> int:
     from app.ui.shelf_ctl import ShelfController
     preview = bool(args.shots or args.demo or args.onboarding_shots or args.settings_shots)
     settings = Settings(Path(tempfile.mkdtemp()) / "s.json") if preview else Settings()   # ONE shared settings object
+    from app.store.db import Store
+    from app.ui.widgets_ctl import WidgetsController
+    from app.winio import system as _winsys
+    store = Store(Path(tempfile.mkdtemp()) / "t.db") if preview else Store()                       # ONE shared store
     pins = PinnedApps(settings, start_menu_index(), launcher=(lambda t: None) if preview else None)
+    widgets_ctl = WidgetsController(settings, store, battery=_winsys.battery)
+    if args.shots or args.demo:                       # realistic sample data for screenshots, no network
+        import time as _time
+        from app.core import widgets as _W
+        settings.set("weather_place", "London, GB")
+        widgets_ctl._weather = _W.Weather(7, "Partly cloudy", "⛅", 9, 3, "C", "London, GB")
+        widgets_ctl._fetched_at = _time.time()
     apps_ctl = AppsController(ctl, pins)
     from app.winio import system as winsys
     shelf_ctl = ShelfController(ctl, system=winsys, demo=bool(args.shots or args.demo))
     engine.rootContext().setContextProperty("shelf", shelf_ctl)
     engine.rootContext().setContextProperty("apps", apps_ctl)
+    engine.rootContext().setContextProperty("widgets", widgets_ctl)
     engine.warnings.connect(lambda ws: [print("QML:", w.toString(), file=sys.stderr) for w in ws])
     engine.load(QUrl.fromLocalFile(str(QML)))
     if not engine.rootObjects():
@@ -112,7 +124,6 @@ def main() -> int:
         from app.store.db import Settings, Store
         from app.core.assistant import Assistant
         from app.claude_bridge.tracker import Bridge, Tracker
-        store = Store()
         ctl._sleep_after = settings["sleep_after_minutes"] * 60 if not os.environ.get("JARVIS_SLEEP_SECONDS") else ctl._sleep_after
         speaker = stt = None
         if not args.no_voice:
@@ -189,6 +200,9 @@ def main() -> int:
         hooks["shelf_clear"] = shelf_ctl.clear
         assistant.shelf = shelf_ctl
         assistant.apps = pins
+        assistant.widgets = widgets_ctl
+        hooks["weather_city"] = widgets_ctl.set_city
+        hooks["units"] = widgets_ctl.units_changed
         if settings["onboarded"] and speaker and not args.say:
             QTimer.singleShot(3000, assistant.greet_if_due)      # once per day
         if not args.no_voice and first_download:
@@ -326,6 +340,9 @@ def main() -> int:
             c_off.setVisible(on)
         refresh_claude_items()
         menu.addSeparator()
+        awake_act = act("Keep awake (no sleep)", lambda on: assistant.set_keep_awake(on) if on != assistant.awake.active else None, True, False)
+        assistant.on_awake_changed = lambda on: (awake_act.blockSignals(True), awake_act.setChecked(on), awake_act.blockSignals(False))
+        app.aboutToQuit.connect(assistant.awake.off)
         act("Do not disturb", lambda on: (assistant.cfg.set("dnd", on), setattr(ctl, "dnd", on), ctl.setMode("sleeping") if on else ctl.wake()),
             True, bool(assistant.cfg["dnd"]))
         act("Speak replies", lambda on: assistant.cfg.set("speak_replies", "voice" if on else "off"),

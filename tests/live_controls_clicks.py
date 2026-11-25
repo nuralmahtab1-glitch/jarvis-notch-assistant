@@ -1,5 +1,9 @@
 """Live UI check: click the real Controls panel with simulated mouse clicks.
 All hardware calls are replaced by recorders, so nothing here touches your radios, volume or brightness."""
+import os as _os
+_os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")      # independent of your real screen and mouse
+_os.environ.setdefault("QT_QUICK_BACKEND", "software")
+
 import sys, tempfile, time
 from pathlib import Path
 sys.path.insert(0, ".")
@@ -41,7 +45,14 @@ from app.ui.apps_ctl import AppsController
 from app.store.db import Settings as _Set
 import tempfile as _tf
 _pins = PinnedApps(_Set(__import__("pathlib").Path(_tf.mkdtemp()) / "a.json"), {}, launcher=lambda t: None)
-eng.rootContext().setContextProperty("apps", AppsController(ctl, _pins))
+_apps_keepalive = AppsController(ctl, _pins)                          # keep a reference (Python would delete it)
+eng.rootContext().setContextProperty("apps", _apps_keepalive)
+from app.ui.widgets_ctl import WidgetsController as _WC
+from app.store.db import Store as _St, Settings as _Se
+import tempfile as _t2, pathlib as _p2
+_d2 = _p2.Path(_t2.mkdtemp())
+_wc_keepalive = _WC(_Se(_d2 / "w.json"), _St(_d2 / "w.db"))          # keep a reference: Python would otherwise delete it
+eng.rootContext().setContextProperty("widgets", _wc_keepalive)
 eng.load(QUrl.fromLocalFile("app/ui/qml/Notch.qml"))
 w = eng.rootObjects()[0]; qw = wrapInstance(getCppPointer(w)[0], QQuickWindow)
 results = []
@@ -97,8 +108,18 @@ bs = slider("brightness"); p = bs.mapToScene(bs.boundingRect().topLeft())
 QTest.mouseClick(qw, Qt.LeftButton, Qt.NoModifier, QPoint(int(p.x() + 0.2 * bs.width()), int(p.y() + bs.height() / 2))); pump(0.6)
 check("click brightness slider at 20% -> brightness applied on release", bri and 15 <= bri[-1] <= 25)
 
-click_text("  Screenshot")
+click_text("Screenshot")
 check("click Screenshot -> screenshot taken and confirmed on the panel", shots == [1] and "Screenshot saved" in ctl.controls["msg"])
+
+from app.winio.awake import KeepAwake as _KA
+a.awake = _KA(lambda flags: 0)                                   # never really hold the machine awake from a test
+click_text("Keep awake")
+check("click Keep awake tile -> keep-awake switched on and the tile lights up", a.awake.active and ctl.controls["awake"] is True)
+click_text("Keep awake")
+check("click it again -> switched off", not a.awake.active and ctl.controls["awake"] is False)
+click_text("Quiet mode")
+check("click Quiet mode tile -> do-not-disturb on", a.cfg["dnd"] is True and ctl.dnd is True)
+a.cfg.set("dnd", False); a.set_dnd(False); ctl.setMode("controls"); pump(1.0)
 
 # the click shield / panel stays open and does not collapse while you use it
 pump(1.0); check("panel stays open while in use", ctl.mode == "controls")
