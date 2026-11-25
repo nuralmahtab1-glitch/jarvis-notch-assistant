@@ -49,6 +49,7 @@ class NotchController(QObject):
     action = Signal(str)          # button presses from the UI: approve, deny, confirm, cancel, ...
     todoToggled = Signal(int)     # id of the item the user ticked
     controlChanged = Signal(str, int)   # a slider/segment in the Controls panel: (name, value)
+    offsetCommitted = Signal(int)       # you finished dragging the notch: remember where it is
 
     def __init__(self, demo_text: bool = False):
         super().__init__()
@@ -71,6 +72,11 @@ class NotchController(QObject):
         self._controls = {"wifi": True, "bluetooth": True, "airplane": False, "volume": 55, "muted": False,
                           "brightness": 70, "battery": 86, "plugged": False, "power": "balanced", "awake": False, "dnd": False, "msg": ""}
         self._needs_buttons = True      # Approve/Deny only make sense for terminal sessions, not the browser extension
+        self._offset_x = 0              # how far you dragged the notch left/right of the screen centre (pixels)
+        self._drag = None               # (cursor x, offset) while dragging
+        self._tucked = False            # slid up out of sight because it is idle
+        self.autohide = False           # the real app switches it on from your setting (tests and screenshots leave it off)
+        self.autohide_after = 6.0
         self._busy_until = 0.0     # user/assistant interaction in progress: do not auto-sleep
         self._demo = QTimer(self); self._demo.timeout.connect(self._next_demo); self._demo_i = 0
         self._poll = QTimer(self); self._poll.setInterval(33); self._poll.timeout.connect(self._tick); self._poll.start()
@@ -105,6 +111,9 @@ class NotchController(QObject):
     music = Property("QVariantMap", lambda s: s._music, notify=changed)
     needsButtons = Property(bool, lambda s: s._needs_buttons, notify=changed)
     controls = Property("QVariantMap", lambda s: s._controls, notify=changed)
+    tucked = Property(bool, lambda s: s._tucked, notify=changed)
+    offsetX = Property(int, lambda s: s._offset_x, notify=changed)
+
     appName = Property(str, lambda s: config.APP_NAME, constant=True)
     credit = Property(str, lambda s: config.CREDIT, constant=True)
     boxW = Property(int, lambda s: SIZES.get(s._mode, (180, 36))[0], notify=changed)
@@ -118,6 +127,8 @@ class NotchController(QObject):
         self._mode = m
         self._hover_key = ""
         self._ov = None
+        if m not in ("idle", "sleeping"):
+            self._tucked = False                      # anything happening brings it back down
         if m != "sleeping":
             self._last_active = time.monotonic()
         self.changed.emit()
@@ -167,8 +178,44 @@ class NotchController(QObject):
 
     def wake(self):
         self._last_active = time.monotonic()
+        if self._tucked:
+            self._tucked = False
+            self.changed.emit()
         if self._mode == "sleeping":
             self.setMode("idle")
+
+    # ---- moving the notch (drag it by any empty part) ----
+    def max_offset(self) -> int:
+        scr = QGuiApplication.primaryScreen()
+        return max(0, (scr.geometry().width() - 640) // 2) if scr else 0
+
+    def setOffsetX(self, x: int):
+        x = int(max(-self.max_offset(), min(self.max_offset(), x)))
+        if x != self._offset_x:
+            self._offset_x = x
+            self.changed.emit()
+
+    @Slot()
+    def dragBegin(self):
+        self._drag = (QCursor.pos().x(), self._offset_x)
+        self._collapse.stop()
+
+    @Slot()
+    def dragMove(self):
+        if self._drag:
+            self.setOffsetX(self._drag[1] + QCursor.pos().x() - self._drag[0])
+            self._last_active = time.monotonic()
+
+    @Slot()
+    def dragEnd(self):
+        if self._drag:
+            self._drag = None
+            self.offsetCommitted.emit(self._offset_x)
+
+    @Slot()
+    def resetPosition(self):
+        self.setOffsetX(0)
+        self.offsetCommitted.emit(0)
 
     # ---- QML slots ----
     @Slot(str)
@@ -240,6 +287,16 @@ class NotchController(QObject):
         p = QCursor.pos()
         dx = p.x() - (g.x() + g.width() / 2)
         dy = p.y() - g.y()
+        dx -= self._offset_x                            # the notch may have been dragged off-centre
+        if self._tucked:                                # hidden: slides back when the mouse touches the very top edge
+            if dy <= 5 and abs(dx) < 170:
+                self._tucked = False
+                self._last_active = time.monotonic()
+                if self._mode == "sleeping" and not self.dnd:
+                    self.setMode("idle")
+                else:
+                    self.changed.emit()
+            return
         near = dy < 26 and abs(dx) < 150
         if near:
             self._last_active = time.monotonic()
@@ -256,6 +313,11 @@ class NotchController(QObject):
         if abs(lx - self._look[0]) > 0.02 or abs(ly - self._look[1]) > 0.02:
             self._look = (lx, ly)
             self.changed.emit()
+        if (self.autohide and self._mode in ("idle", "sleeping") and self._drag is None and not near
+                and time.monotonic() > self._busy_until and time.monotonic() - self._last_active > self.autohide_after):
+            self._tucked = True                         # idle for a few seconds: slide up out of the way
+            self.changed.emit()
+            return
         if (self._mode == "idle" and time.monotonic() > self._busy_until
                 and time.monotonic() - self._last_active > self._sleep_after):
             self.setMode("sleeping")

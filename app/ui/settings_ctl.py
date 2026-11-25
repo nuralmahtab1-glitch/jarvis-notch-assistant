@@ -113,7 +113,7 @@ class SettingsController(QObject):
     def _validate(self, key, v):
         try:
             if key in ("wake_word", "dnd", "greeting", "claude_bridge", "claude_hide_details",
-                       "claude_quiet_when_focused", "claude_web", "lyrics", "shelf_enabled", "awake_display", "awake_claude", "awake_focus", "speak_done", "speak_needs", "speak_error"):
+                       "claude_quiet_when_focused", "claude_web", "lyrics", "shelf_enabled", "autohide", "awake_display", "awake_claude", "awake_focus", "speak_done", "speak_needs", "speak_error"):
                 return bool(v)
             if key == "address":
                 v = str(v).strip()[:40]
@@ -126,6 +126,8 @@ class SettingsController(QObject):
                 return round(clamp(float(v), 0.8, 1.4), 2)
             if key == "sleep_after_minutes":
                 return int(clamp(int(float(v)), 1, 120))
+            if key == "autohide_seconds":
+                return int(clamp(int(float(v)), 2, 120))
             if key == "claude_approval_timeout":
                 return int(clamp(int(float(v)), 5, 120))
             if key in ("ptt_command_key", "ptt_dictate_key"):
@@ -188,6 +190,11 @@ class SettingsController(QObject):
             a.persona.preset = v
         elif key == "voice_speed" and a.speaker:
             a.speaker.speed = v
+        elif key == "autohide":
+            self.ctl.autohide = bool(v)
+            self.ctl.wake()
+        elif key == "autohide_seconds":
+            self.ctl.autohide_after = float(v)
         elif key == "sleep_after_minutes" and not os.environ.get("JARVIS_SLEEP_SECONDS"):
             self.ctl._sleep_after = v * 60
         elif key == "dnd":
@@ -367,6 +374,11 @@ class SettingsController(QObject):
             err = cb.test()
             self.a.ui(lambda: self._say("Connected. The cloud brain works." if not err else err))
         threading.Thread(target=work, daemon=True).start()
+
+    @Slot()
+    def resetNotchPosition(self):
+        self.ctl.resetPosition()
+        self._say("Jarvis is back in the middle.")
 
     @Slot(str)
     def importModel(self, path: str):

@@ -20,6 +20,7 @@ DEFAULT_SETTINGS = {
     "ptt_dictate_key": "right alt",
     "wake_word": True,
     "sleep_after_minutes": 5,
+    "autohide": True, "autohide_seconds": 6, "notch_offset_x": 0,
     "dnd": False,
     "claude_bridge": True,
     "claude_hide_details": False,

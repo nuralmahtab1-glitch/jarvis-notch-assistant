@@ -10,7 +10,7 @@ Window {
     visible: true
     color: "transparent"
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WindowDoesNotAcceptFocus
-    x: Screen.virtualX + Math.round((Screen.width - width) / 2)
+    x: Screen.virtualX + Math.round((Screen.width - width) / 2) + notch.offsetX
     y: Screen.virtualY
     title: notch.appName
 
@@ -70,7 +70,8 @@ Window {
     Item {
         id: body
         x: Math.round((win.width - width) / 2)
-        y: 0
+        y: notch.tucked ? -(notch.boxH + 10) : 0           // idle for a while: slide up out of sight
+        Behavior on y { NumberAnimation { duration: 380; easing.type: Easing.InOutCubic } }
         width: notch.boxW
         height: notch.boxH
         Behavior on width { NumberAnimation { duration: 280; easing.type: Easing.OutBack; easing.overshoot: 0.7 } }
@@ -102,6 +103,14 @@ Window {
         }
 
         HoverHandler { id: hh; onHoveredChanged: notch.bodyHover(hovered) }
+        // drag the notch sideways by any empty part (buttons and sliders keep their own clicks)
+        DragHandler {
+            target: null
+            acceptedButtons: Qt.LeftButton
+            grabPermissions: PointerHandler.ApprovesTakeOverByAnything
+            onActiveChanged: { if (active) { notch.dragBegin(); dragTimer.start() } else { dragTimer.stop(); notch.dragEnd() } }
+        }
+        Timer { id: dragTimer; interval: 16; repeat: true; onTriggered: notch.dragMove() }
         // Dragging a file or text onto the notch opens the shelf; dropping parks it there.
         DropArea {
             anchors.fill: parent

@@ -89,6 +89,12 @@ Window {
                                 onEditingFinished: sc.set("address", text) } } }
                     SRow { title: "Start with Windows"; desc: "Open " + sc.appName + " automatically when you sign in."
                         Switch2 { checked: win.autostart; onToggled: { win.autostart = on; sc.setAutostart(on) } } }
+                    SRow { title: "Hide when idle"; desc: "After a few seconds of nothing, Jarvis slides up out of sight. Move the mouse to the very top edge of the screen to bring it back. It also comes back by itself for reminders, approvals and \"Hey Jarvis\"."
+                        Switch2 { checked: win.v.autohide; onToggled: sc.set("autohide", on) } }
+                    SRow { visible: win.v.autohide; title: "Hide after"; desc: "How long it waits before sliding away."
+                        Slid { from: 2; to: 60; step: 1; value: win.v.autohide_seconds; suffix: " sec"; onMoved: sc.set("autohide_seconds", v) } }
+                    SRow { title: "Position"; desc: "Drag Jarvis left or right by any empty part of it. It remembers where you put it."
+                        Btn { label: "Put back in the middle"; onClicked: sc.resetNotchPosition() } }
                     SRow { title: "Fall asleep after"; desc: "When idle, the notch dims and shows the moon."
                         Slid { from: 1; to: 60; step: 1; value: win.v.sleep_after_minutes; suffix: " min"; onMoved: sc.set("sleep_after_minutes", v) } }
                     SRow { title: "Do not disturb"; desc: "Stay asleep and silent. Reminders wait until you turn this off."

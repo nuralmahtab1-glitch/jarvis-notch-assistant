@@ -106,6 +106,11 @@ def main() -> int:
     state = {"w": 0, "h": 0}
 
     def apply_mask(extra: bool):
+        if ctl.tucked:                                   # hidden: swallow no clicks at all (1 pixel is the smallest mask)
+            win.setMask(QRegion(QRect(0, 0, 1, 1)))
+            state["t"] = True
+            return
+        state["t"] = False
         w, h = SIZES.get(ctl.mode, (180, 36))
         ww = win.width()
         pad = 44 if extra else 6
@@ -119,11 +124,17 @@ def main() -> int:
 
     def on_change():
         w, h = SIZES.get(ctl.mode, (180, 36))
-        if (w, h) != (state["w"], state["h"]):
+        if ctl.tucked != state.get("t", False):
+            apply_mask(False)
+        elif (w, h) != (state["w"], state["h"]) and not ctl.tucked:
             apply_mask(True)
             shrink.start()
     ctl.changed.connect(on_change)
     apply_mask(False)
+    ctl.autohide = bool(settings["autohide"]) and not preview
+    ctl.autohide_after = float(settings["autohide_seconds"])
+    ctl.setOffsetX(int(settings["notch_offset_x"]))
+    ctl.offsetCommitted.connect(lambda x: settings.set("notch_offset_x", int(x)))
 
     # --- while the teleprompter shows, ask Windows to keep the notch out of screen recordings and screen-sharing ---
     privacy = {"on": None}
@@ -414,6 +425,7 @@ def main() -> int:
     demo = QAction("Cycle demo states", menu)
     demo.triggered.connect(ctl.startDemo)
     menu.addAction(demo)
+    act("Put Jarvis back in the middle", ctl.resetPosition)
     act("Sleep", lambda: ctl.setMode("sleeping"))
     menu.addSeparator()
     act("Quit", app.quit)

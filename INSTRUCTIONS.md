@@ -40,6 +40,12 @@ Made by Nur Al Mahtab. Jarvis is a voice assistant that lives in a small pill at
 3. **Your own model:** Settings -> AI brain -> *Add your own model*: paste the path of a `.gguf` file and press Import.
 4. **Weather city, clocks, favourite sites:** Settings -> General.
 
+## Moving and hiding Jarvis
+
+- **It hides by itself:** after a few seconds of nothing, Jarvis slides up out of sight. Push the mouse to the **very top edge** of the screen (middle) to bring it back. It also returns on its own for "Hey Jarvis", reminders and approvals. Turn this off or change the delay in Settings -> General -> *Hide when idle*.
+- **Move it:** point at Jarvis so it opens, then **drag any empty part** of it left or right. It remembers the spot. Buttons and sliders still click normally.
+- **Put it back in the middle:** Settings -> General -> *Put back in the middle*, or the tray menu.
+
 ## Panels (tab icons)
 
 Timer/focus, Widgets (clocks, weather, to-do), Shelf (drop files and text to keep them handy), Controls (volume, brightness, Wi-Fi, Bluetooth, Keep awake, Quiet mode, Screenshot), Apps (pinned programs), Menu (favourite sites, teleprompter, music, Settings).

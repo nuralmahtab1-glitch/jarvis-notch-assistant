@@ -127,6 +127,12 @@ pairing code into the extension's options page and press Test connection.
   not recognised, Jarvis shows nothing rather than guessing. Loading it as a real extension was not tested because
   current Chrome/Edge no longer allow that from the command line.
 
+## Hiding and moving the notch
+
+After a few idle seconds (default 6, configurable, or off) the notch slides up out of sight; touching the very top edge in the middle of the
+screen, "Hey Jarvis", a reminder or an approval brings it back. Drag any empty part of the open notch sideways to move it (position is
+remembered; Settings or the tray menu puts it back in the middle). It moves left and right only, on the main screen.
+
 ## Menu and teleprompter
 
 The last tab icon opens the **Menu**: your favourite sites (edit them in Settings; only plain web addresses are ever
