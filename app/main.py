@@ -35,6 +35,8 @@ def main() -> int:
     ap.add_argument("--state", help="start in a given state")
     ap.add_argument("--shots", help="write a PNG of every state into this folder, then quit")
     ap.add_argument("--say", help="pretend you said this (no microphone), then keep running")
+    ap.add_argument("--onboarding", action="store_true", help="show the first-run tour now")
+    ap.add_argument("--onboarding-shots", help="write a PNG of every onboarding step into this folder, then quit")
     ap.add_argument("--no-voice", action="store_true", help="do not load speech models or speak")
     ap.add_argument("--no-keys", action="store_true", help="do not install the push-to-talk keyboard hook")
     args = ap.parse_args()
@@ -44,7 +46,7 @@ def main() -> int:
     app.setQuitOnLastWindowClosed(False)
 
     lock = None
-    if not args.shots:
+    if not args.shots and not args.onboarding_shots:
         lock = QLockFile(QDir.temp().absoluteFilePath("jarvis-notch.lock"))
         lock.setStaleLockTime(0)
         if not lock.tryLock(100):
@@ -86,7 +88,7 @@ def main() -> int:
 
     # --- assistant (voice, tools, Claude Code bridge) ---
     assistant = None
-    if not args.shots and not args.demo:
+    if not args.shots and not args.demo and not args.onboarding_shots:
         import threading
         from app.store.db import Settings, Store
         from app.core.assistant import Assistant
@@ -146,24 +148,124 @@ def main() -> int:
     tray = QSystemTrayIcon(tray_icon(), app)
     tray.setToolTip(f"{config.APP_NAME} - {config.CREDIT}")
     menu = QMenu()
-    about = QAction(f"About {config.APP_NAME}", menu)
-    about.triggered.connect(lambda: QMessageBox.information(
-        None, f"About {config.APP_NAME}",
-        f"{config.APP_NAME} {config.VERSION}\n\n{config.CREDIT}\n\nA local-first voice assistant that lives in your notch."))
+
+    def act(text, fn, checkable=False, checked=False):
+        a = QAction(text, menu)
+        a.setCheckable(checkable)
+        if checkable:
+            a.setChecked(checked)
+            a.toggled.connect(fn)
+        else:
+            a.triggered.connect(lambda: fn())
+        menu.addAction(a)
+        return a
+
+    def show_about():
+        QMessageBox.information(None, f"About {config.APP_NAME}",
+            f"{config.APP_NAME} {config.VERSION}"
+            f"\n\n{config.CREDIT}"
+            "\n\nA local-first voice assistant that lives in your notch."
+            f"\nSay \"{config.WAKE_PHRASE}\", or hold Right Ctrl to talk and Right Alt to dictate.")
+
+    act(f"About {config.APP_NAME}", show_about)
+    menu.addSeparator()
+    if assistant:
+        from app.claude_bridge import installer
+
+        def connect_claude():
+            path = installer.default_settings_path()
+            try:
+                diff = installer.preview(path)
+            except Exception as e:
+                QMessageBox.warning(None, "Connect Claude Code", f"I could not read {path}:\n{e}\n\nNothing was changed.")
+                return
+            box = QMessageBox(QMessageBox.Question, "Connect Claude Code",
+                              "This adds hooks to your Claude Code settings so the notch can show what Claude is "
+                              "doing and let you approve actions."
+                              "\n\nYour existing settings are backed up first and "
+                              "your own hooks are kept. You can disconnect any time.",
+                              QMessageBox.Yes | QMessageBox.Cancel)
+            box.setDetailedText(diff or "(no changes needed)")
+            if box.exec() == QMessageBox.Yes:
+                b = installer.connect(path)
+                tray.showMessage(config.APP_NAME, "Claude Code connected." + (f" Backup: {b.name}" if b else ""))
+                refresh_claude_items()
+
+        def disconnect_claude():
+            b = installer.disconnect()
+            tray.showMessage(config.APP_NAME, "Claude Code disconnected." + (f" Backup: {b.name}" if b else ""))
+            refresh_claude_items()
+
+        c_on = act("Connect Claude Code...", connect_claude)
+        c_off = act("Disconnect Claude Code", disconnect_claude)
+
+        def refresh_claude_items():
+            on = installer.is_connected()
+            c_on.setVisible(not on)
+            c_off.setVisible(on)
+        refresh_claude_items()
+        menu.addSeparator()
+        act("Do not disturb", lambda on: (assistant.cfg.set("dnd", on), setattr(ctl, "dnd", on), ctl.setMode("sleeping") if on else ctl.wake()),
+            True, bool(assistant.cfg["dnd"]))
+        act("Speak replies", lambda on: assistant.cfg.set("speak_replies", "voice" if on else "off"),
+            True, assistant.cfg["speak_replies"] != "off")
+        from app.winio import autostart
+        act("Start with Windows", lambda on: autostart.set_enabled(on), True, autostart.is_enabled())
+        menu.addSeparator()
     demo = QAction("Cycle demo states", menu)
     demo.triggered.connect(ctl.startDemo)
-    stop = QAction("Stop demo", menu)
-    stop.triggered.connect(ctl.stopDemo)
-    sleep = QAction("Sleep", menu)
-    sleep.triggered.connect(lambda: ctl.setMode("sleeping"))
-    quit_ = QAction("Quit", menu)
-    quit_.triggered.connect(app.quit)
-    for a in (about, demo, stop, sleep):
-        menu.addAction(a)
+    menu.addAction(demo)
+    act("Sleep", lambda: ctl.setMode("sleeping"))
     menu.addSeparator()
-    menu.addAction(quit_)
+    act("Quit", app.quit)
     tray.setContextMenu(menu)
     tray.show()
+
+    # --- onboarding (first run, --onboarding, or --onboarding-shots DIR) ---
+    def start_onboarding(settings, speaker, shots: str | None = None):
+        from app.ui.onboarding import Onboarding
+        from app.claude_bridge import installer
+        try:
+            from app.audio.recorder import list_input_devices
+            mics = [n for _, n in list_input_devices()][:1] or ["Default microphone"]
+        except Exception:
+            mics = ["Default microphone"]
+        ob = Onboarding(settings, speaker, installer, mics)
+        eng = QQmlApplicationEngine()
+        eng.warnings.connect(lambda ws: [print("QML:", w.toString(), file=sys.stderr) for w in ws])
+        eng.rootContext().setContextProperty("ob", ob)
+        eng.load(QUrl.fromLocalFile(str(Path(__file__).parent / "ui" / "qml" / "Onboarding.qml")))
+        if not eng.rootObjects():
+            return
+        w = eng.rootObjects()[0]
+        qw = wrapInstance(getCppPointer(w)[0], QQuickWindow)
+        app._onboarding = (eng, ob)
+
+        def close():
+            w.close(); eng.deleteLater()
+            if ctl.mode == "sleeping":
+                ctl.wake()
+            if shots:
+                app.quit()
+        ob.finished.connect(close)
+        if shots:
+            out = Path(shots); out.mkdir(parents=True, exist_ok=True)
+            i = {"n": 0}
+
+            def snap():
+                qw.grabWindow().save(str(out / f"onboarding_{i['n']:02d}.png"))
+                i["n"] += 1
+                if i["n"] >= 17:
+                    return app.quit()
+                w.setProperty("step", i["n"]); QTimer.singleShot(int(os.environ.get("JARVIS_SHOT_DELAY", "1100")), snap)
+            QTimer.singleShot(900, snap)
+
+    if args.onboarding_shots:
+        from app.store.db import Settings
+        import tempfile
+        start_onboarding(Settings(Path(tempfile.mkdtemp()) / "s.json"), None, args.onboarding_shots)
+    elif assistant and (args.onboarding or not assistant.cfg["onboarded"]):
+        start_onboarding(assistant.cfg, assistant.speaker)
 
     if args.state:
         ctl.setMode(args.state)
