@@ -80,6 +80,18 @@ file up first, keeps your own hooks, and tags its entries so **Disconnect** remo
 - Hooks call a tiny stdlib-only helper (`app/claude_bridge/hook.py`) that talks to a loopback-only, token-protected
   local server. If Jarvis is not running the helper exits silently and instantly.
 
+## Menu and teleprompter
+
+The last tab icon opens the **Menu**: your favourite sites (edit them in Settings; only plain web addresses are ever
+opened), shortcuts to the teleprompter, now-playing and Settings, and three tips.
+
+**Teleprompter:** copy your script, then say "start the teleprompter" (or press it in the Menu). The notch widens into
+a reading strip: previous line dimmed, current line large, the next two below, a progress bar and controls
+(restart, play/pause, slower/faster in 10 wpm steps, close). It scrolls at a steady pace (default 140 words a minute,
+remembered), and stays awake while you read. While it is showing, **Windows is told to keep the notch out of screen
+recordings and screen-sharing**, so your script stays private (verified with Windows' own display-affinity check).
+Not built: following your voice to set the pace (it scrolls at a fixed speed you control).
+
 ## Keep awake (stop the laptop sleeping)
 
 Three ways, all using Windows' own "do not sleep" request (no admin rights; Windows drops it by itself if Jarvis
@@ -186,7 +198,7 @@ now-playing + synced lyrics, tray menu, 17-step onboarding.
 **Not built yet:**
 - A full **Models page** for cloud providers / API keys (the local brain below is built).
 - Adding your own models by file or Ollama name (the Settings window lists the built-in Qwen3 models only).
-- World clocks, weather and the teleprompter (their tab-icon tooltips exist, the features don't).
+- Voice-paced teleprompter (it scrolls at a fixed speed you control).
 - Dragging an item **out of** the Shelf into another app uses Qt's native drag, which I could not exercise
   automatically (dropping *in* is tested with synthesized events). Click to copy and the Paste button are tested.
 - A real on/off switch for **night light, battery saver and accessibility**: Windows gives apps no supported way to

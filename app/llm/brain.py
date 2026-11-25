@@ -26,7 +26,7 @@ TOOLS: dict[str, dict[str, str]] = {
     "go_to_sleep": {}, "claude_status": {}, "claude_approve": {}, "claude_deny": {},
     "wifi_toggle": {"on": "true, false, or omit to toggle"}, "bluetooth_toggle": {"on": "true, false, or omit to toggle"},
     "airplane_toggle": {"on": "true, false, or omit to toggle"}, "night_light_toggle": {},
-    "power_mode_set": {"mode": "efficiency, balanced or performance"}, "controls_open": {}, "shelf_open": {}, "apps_open": {}, "weather": {}, "time_in": {"city": "city name"}, "keep_awake": {"on": "true to keep the laptop awake, false to allow sleep", "minutes": "optional duration"}, "widgets_open": {},
+    "power_mode_set": {"mode": "efficiency, balanced or performance"}, "controls_open": {}, "shelf_open": {}, "apps_open": {}, "weather": {}, "time_in": {"city": "city name"}, "keep_awake": {"on": "true to keep the laptop awake, false to allow sleep", "minutes": "optional duration"}, "widgets_open": {}, "prompter_start": {}, "prompter_stop": {}, "menu_open": {},
     "write_text": {"instruction": "what to write, e.g. 'a polite email asking for a deadline extension'"},
 }
 INT_ARGS = {"minutes": 25, "level": 50, "delta": 10}
@@ -230,6 +230,9 @@ class Brain:
         "volume_set": re.compile(r"volume|loud|quiet|sound|audio|speaker|hear|decibel|turn it", re.I),
         "volume_change": re.compile(r"volume|loud|quiet|sound|audio|speaker|hear|turn it|up|down", re.I),
         "keep_awake": re.compile(r"awake|sleep|caffeinate|screen on|stay on|wake", re.I),
+        "prompter_start": re.compile(r"prompter|script|read", re.I),
+        "prompter_stop": re.compile(r"prompter|script|stop|close", re.I),
+        "menu_open": re.compile(r"menu", re.I),
         "weather": re.compile(r"weather|rain|snow|temperature|forecast|cold|hot|sunny|umbrella|degrees|warm|outside", re.I),
         "time_in": re.compile(r"time|clock|hour", re.I),
         "widgets_open": re.compile(r"widget|dashboard|clock|weather", re.I),

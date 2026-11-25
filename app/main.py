@@ -69,10 +69,17 @@ def main() -> int:
     settings = Settings(Path(tempfile.mkdtemp()) / "s.json") if preview else Settings()   # ONE shared settings object
     from app.store.db import Store
     from app.ui.widgets_ctl import WidgetsController
+    from app.ui.prompter_ctl import MenuController, PrompterController
     from app.winio import system as _winsys
     store = Store(Path(tempfile.mkdtemp()) / "t.db") if preview else Store()                       # ONE shared store
     pins = PinnedApps(settings, start_menu_index(), launcher=(lambda t: None) if preview else None)
     widgets_ctl = WidgetsController(settings, store, battery=_winsys.battery)
+    prompter_ctl = PrompterController(ctl, settings)
+    menu_ctl = MenuController(ctl, settings, opener=(lambda u: None) if preview else None, prompter=prompter_ctl)
+    if args.shots or args.demo:
+        from app.core.prompter import Prompter as _P
+        prompter_ctl.p = _P("Good evening everyone, and welcome. Tonight I want to talk about three simple ideas that changed how I work. First, keep it small. Second, keep it local. Third, always ask before you act.", 140)
+        prompter_ctl.p.words_done = 14
     if args.shots or args.demo:                       # realistic sample data for screenshots, no network
         import time as _time
         from app.core import widgets as _W
@@ -85,6 +92,8 @@ def main() -> int:
     engine.rootContext().setContextProperty("shelf", shelf_ctl)
     engine.rootContext().setContextProperty("apps", apps_ctl)
     engine.rootContext().setContextProperty("widgets", widgets_ctl)
+    engine.rootContext().setContextProperty("prompter", prompter_ctl)
+    engine.rootContext().setContextProperty("menu", menu_ctl)
     engine.warnings.connect(lambda ws: [print("QML:", w.toString(), file=sys.stderr) for w in ws])
     engine.load(QUrl.fromLocalFile(str(QML)))
     if not engine.rootObjects():
@@ -115,6 +124,20 @@ def main() -> int:
             shrink.start()
     ctl.changed.connect(on_change)
     apply_mask(False)
+
+    # --- while the teleprompter shows, ask Windows to keep the notch out of screen recordings and screen-sharing ---
+    privacy = {"on": None}
+
+    def sync_capture_privacy():
+        want = ctl.mode == "prompter"
+        if want != privacy["on"]:
+            privacy["on"] = want
+            try:
+                import ctypes
+                ctypes.windll.user32.SetWindowDisplayAffinity(int(win.winId()), 0x11 if want else 0)   # WDA_EXCLUDEFROMCAPTURE
+            except Exception:
+                pass
+    ctl.changed.connect(sync_capture_privacy)
 
     # --- assistant (voice, tools, Claude Code bridge) ---
     assistant = None
@@ -201,6 +224,7 @@ def main() -> int:
         assistant.shelf = shelf_ctl
         assistant.apps = pins
         assistant.widgets = widgets_ctl
+        assistant.prompter = prompter_ctl
         hooks["weather_city"] = widgets_ctl.set_city
         hooks["units"] = widgets_ctl.units_changed
         if settings["onboarded"] and speaker and not args.say:
@@ -255,6 +279,10 @@ def main() -> int:
         s_ = Settings(d / "s.json")
         a_ = Assistant(ctl, s_, Store(d / "t.db"))
         open_settings(a_, ctl, s_, a_.store, args.settings_shots)
+    if assistant:
+        ctl.action.connect(lambda name: open_settings(assistant, ctl, assistant.cfg, assistant.store) if name == "open_settings" else None)
+    if args.settings_shots:
+        pass
     elif assistant and args.settings:
         QTimer.singleShot(400, lambda: open_settings(assistant, ctl, assistant.cfg, assistant.store))
 

@@ -1,5 +1,10 @@
 """Live visual regression check: feed every text-heavy notch state absurdly long text and verify that NOTHING is
 drawn outside the notch's box (the window is transparent, so any pixel outside the body means text overflowed)."""
+import os as _os
+_os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+_os.environ.setdefault("QT_QUICK_BACKEND", "software")
+_os.environ.setdefault("QT_QPA_FONTDIR", "C:/Windows/Fonts")
+
 import sys, tempfile, time
 from pathlib import Path
 sys.path.insert(0, ".")
@@ -36,6 +41,11 @@ import tempfile as _t2, pathlib as _p2
 _d2 = _p2.Path(_t2.mkdtemp())
 _wc_keepalive = _WC(_Se(_d2 / "w.json"), _St(_d2 / "w.db"))          # keep a reference: Python would otherwise delete it
 eng.rootContext().setContextProperty("widgets", _wc_keepalive)
+from app.ui.prompter_ctl import PrompterController as _PC, MenuController as _MC
+_pc_keepalive = _PC(ctl, _Se(_d2 / "p.json"), clipboard=Clip() if "Clip" in dir() else None)
+_mc_keepalive = _MC(ctl, _Se(_d2 / "m.json"), opener=lambda u: None, prompter=_pc_keepalive)
+eng.rootContext().setContextProperty("prompter", _pc_keepalive)
+eng.rootContext().setContextProperty("menu", _mc_keepalive)
 eng.load(QUrl.fromLocalFile("app/ui/qml/Notch.qml"))
 w = eng.rootObjects()[0]; qw = wrapInstance(getCppPointer(w)[0], QQuickWindow)
 
@@ -47,7 +57,9 @@ shelf.shelf.add_text(LONG); shelf.shelf.add_text(LONG_NOSPACE); shelf.changed.em
 pins.items = [AppEntry(LONG_NOSPACE, "x"), AppEntry(LONG, "y")] * 4
 apps.changed.emit()
 
-CASES = [("widgets", None), ("music", None), ("todo", None), ("shelf", None), ("apps", None), ("answer", (LONG, LONG)), ("confirm", (LONG, LONG)),
+from app.core.prompter import Prompter as _Pr
+_pc_keepalive.p = _Pr((LONG_NOSPACE + " " + LONG) * 3, 140); _pc_keepalive.p.words_done = 3
+CASES = [("menu", None), ("prompter", None), ("widgets", None), ("music", None), ("todo", None), ("shelf", None), ("apps", None), ("answer", (LONG, LONG)), ("confirm", (LONG, LONG)),
          ("reminder", (LONG, LONG)), ("claudeNeeds", (LONG, LONG)), ("claudeDone", (LONG, LONG)), ("claudeWorking", (LONG, LONG)),
          ("claudeError", (LONG, LONG)), ("hearing", (LONG, "")), ("speaking", (LONG, "")), ("working", (LONG, "")),
          ("done", (LONG, "")), ("listening", (LONG, "")), ("volume", (LONG, "")), ("expanded", (LONG, LONG))]

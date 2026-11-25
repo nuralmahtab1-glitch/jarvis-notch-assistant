@@ -2,6 +2,7 @@
 import os as _os
 _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")      # independent of your real screen and mouse
 _os.environ.setdefault("QT_QUICK_BACKEND", "software")
+_os.environ.setdefault("QT_QPA_FONTDIR", "C:/Windows/Fonts")      # real fonts, so text metrics are realistic offscreen
 
 import sys, tempfile, time
 from pathlib import Path

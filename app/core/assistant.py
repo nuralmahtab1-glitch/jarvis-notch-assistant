@@ -46,6 +46,7 @@ class Assistant(QObject):
         self._focus_total = 0
         self._focus_label = "Focus"
         self._claude_seen: dict[str, str] = {}
+        self.prompter = None               # set by main: the teleprompter
         self.widgets = None                # set by main: clocks/weather
         self.apps = None                   # set by main: the pinned apps (voice 'open <app>')
         self.shelf = None                  # set by main: the Shelf controller
@@ -86,7 +87,7 @@ class Assistant(QObject):
         m = self.speak_mode
         return m == "always" or (m == "voice" and src in ("key", "wake"))
 
-    CARD_MODES = ("todo", "volume", "focus", "music", "controls", "shelf", "apps", "widgets")
+    CARD_MODES = ("todo", "volume", "focus", "music", "controls", "shelf", "apps", "widgets", "menu", "prompter")
 
     def say(self, text: str, src: str = "key", mode: str = "done", hold: float = 2.6):
         """Show the reply in the notch and speak it if the interaction was by voice.
@@ -353,6 +354,17 @@ class Assistant(QObject):
             if it.name == "night_light_toggle":
                 self.qs.open_settings_page("nightlight")
                 return "Windows does not let apps switch night light, so I opened its settings."
+            if it.name == "prompter_start":
+                if not self.prompter:
+                    return "The teleprompter is not available."
+                self.ctl.wake()
+                return None if self.prompter.start() else self.prompter.message
+            if it.name == "prompter_stop":
+                if self.prompter:
+                    self.prompter.close()
+                return None
+            if it.name == "menu_open":
+                self.ctl.wake(); self.ctl.setMode("menu"); return ""
             if it.name == "keep_awake":
                 return self.voice_keep_awake(a.get("on", True), a.get("minutes"), a.get("display"))
             if it.name == "shelf_open":

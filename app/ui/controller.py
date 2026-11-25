@@ -26,13 +26,13 @@ DEFAULT_TEXT = {
 }
 MODES = ["idle", "sleeping", "expanded", "listening", "hearing", "working", "done", "recording",
          "speaking", "confirm", "volume", "reminder", "music", "focus", "todo",
-         "claudeWorking", "claudeNeeds", "claudeDone", "claudeError", "controls", "shelf", "apps", "widgets"]
+         "claudeWorking", "claudeNeeds", "claudeDone", "claudeError", "controls", "shelf", "apps", "widgets", "menu", "prompter"]
 SIZES = {  # width, height
     "idle": (180, 36), "sleeping": (180, 36), "peek": (210, 42), "expanded": (560, 150),
     "listening": (300, 44), "recording": (300, 44), "hearing": (400, 44), "working": (300, 44),
     "done": (250, 44), "speaking": (340, 44), "confirm": (450, 96), "volume": (300, 44),
     "reminder": (400, 76), "music": (560, 176), "focus": (560, 150), "todo": (560, 176),
-    "claudeWorking": (440, 44), "claudeNeeds": (500, 96), "claudeDone": (500, 76), "claudeError": (400, 44), "answer": (520, 92), "controls": (560, 268), "shelf": (560, 262), "apps": (560, 264), "widgets": (560, 262),
+    "claudeWorking": (440, 44), "claudeNeeds": (500, 96), "claudeDone": (500, 76), "claudeError": (400, 44), "answer": (520, 92), "controls": (560, 268), "shelf": (560, 262), "apps": (560, 264), "widgets": (560, 262), "menu": (560, 236), "prompter": (560, 176),
 }
 DEMO_TEXT = {
     "hearing": ("Remind me to water the plants at six", ""), "speaking": ("Certainly.", ""),
@@ -176,11 +176,11 @@ class NotchController(QObject):
             self._last_active = time.monotonic()
             if self._mode in ("idle", "sleeping", "peek"):
                 self.setMode("expanded")
-        elif self._mode in ("expanded", "controls", "shelf", "apps", "widgets"):
+        elif self._mode in ("expanded", "controls", "shelf", "apps", "widgets", "menu"):
             self._collapse.start()
 
     def _do_collapse(self):
-        if self._mode in ("expanded", "controls", "shelf", "apps", "widgets"):
+        if self._mode in ("expanded", "controls", "shelf", "apps", "widgets", "menu"):
             self.setMode("idle")
 
     @Slot(str)

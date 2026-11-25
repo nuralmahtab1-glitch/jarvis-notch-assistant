@@ -99,6 +99,10 @@ Window {
                                 font.family: win.fontFam; font.pixelSize: 14; color: win.ink; onEditingFinished: sc.setWeatherCity(text) } } }
                     SRow { title: "Temperature unit"; desc: ""
                         Seg { options: ["C", "F"]; labels: ["Celsius", "Fahrenheit"]; current: win.v.weather_units; onPicked: sc.set("weather_units", value) } }
+                    SRow { title: "Favourite sites"; desc: "Shown in the Menu panel, like youtube.com, github.com. Up to eight."
+                        Rectangle { width: 320; height: 36; radius: 10; color: "#fff"; border.color: sitesIn.activeFocus ? win.accent : "#CFCFD8"
+                            TextInput { id: sitesIn; anchors.fill: parent; anchors.margins: 10; text: win.v.websites.map(function(u) { return u.replace(/^https?:\/\//, "") }).join(", "); clip: true
+                                font.family: win.fontFam; font.pixelSize: 13; color: win.ink; onEditingFinished: sc.set("websites", text) } } }
                     SRow { title: "World clocks"; desc: "Up to four, like London=Europe/London, Tokyo=Asia/Tokyo."
                         Rectangle { width: 320; height: 36; radius: 10; color: "#fff"; border.color: clkIn.activeFocus ? win.accent : "#CFCFD8"
                             TextInput { id: clkIn; anchors.fill: parent; anchors.margins: 10; text: win.v.clocks.join(", "); clip: true

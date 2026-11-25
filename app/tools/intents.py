@@ -104,6 +104,12 @@ def parse(text: str, now: datetime | None = None) -> Intent | None:
         return Intent("keep_awake", {"on": True, "minutes": awake_minutes(t), "display": None})
     if AWAKE_OFF.search(t):
         return Intent("keep_awake", {"on": False, "minutes": None})
+    if re.search(r"(stop|close|end|hide|turn off) (the |my )?(teleprompter|prompter)", t):
+        return Intent("prompter_stop")
+    if re.search(r"(start|open|begin|show|run|use) (the |my )?(teleprompter|prompter)|read (me )?my script|teleprompter", t):
+        return Intent("prompter_start")
+    if re.search(r"(open|show|bring up) (the |my )?menu\b", t):
+        return Intent("menu_open")
     if AWAKE_ON.search(t):
         return Intent("keep_awake", {"on": True, "minutes": awake_minutes(t), "display": bool(re.search(r"screen", t)) or None})
     if re.search(r"\b(go to sleep|goodnight|good night|sleep now)\b", t):

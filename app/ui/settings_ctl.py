@@ -147,7 +147,13 @@ class SettingsController(QObject):
             if key == "mic_device":
                 return str(v) if str(v) in self._mics else None
             if key == "websites":
-                return [str(x).strip() for x in v if str(x).strip()][:12]
+                from app.ui.prompter_ctl import clean_sites
+                raw = [p.strip() for p in (v.split(",") if isinstance(v, str) else list(v)) if p.strip()]
+                good = clean_sites(raw)
+                if raw and not good:
+                    self._say("Those do not look like website addresses. Use something like youtube.com.")
+                    return None
+                return good
         except (TypeError, ValueError):
             return None
         return v

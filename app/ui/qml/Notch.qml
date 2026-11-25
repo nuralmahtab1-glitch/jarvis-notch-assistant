@@ -37,7 +37,7 @@ Window {
 
     readonly property string mode: notch.mode
     readonly property bool isTiny: mode === "idle" || mode === "sleeping" || mode === "peek"
-    readonly property bool isPanel: mode === "expanded" || mode === "music" || mode === "focus" || mode === "todo" || mode === "controls" || mode === "shelf" || mode === "apps" || mode === "widgets"
+    readonly property bool isPanel: mode === "expanded" || mode === "music" || mode === "focus" || mode === "todo" || mode === "controls" || mode === "shelf" || mode === "apps" || mode === "widgets" || mode === "menu" || mode === "prompter"
     readonly property bool isCard: mode === "confirm" || mode === "claudeNeeds" || mode === "reminder" || mode === "claudeDone" || mode === "answer"
     readonly property bool isCompact: !isTiny && !isPanel && !isCard
     readonly property bool sleeping: mode === "sleeping"
@@ -309,7 +309,7 @@ Window {
                 TabIcon { glyph: ""; key: "shelf"; onClicked: { shelf.opened(); notch.setMode("shelf") } }
                 TabIcon { glyph: ""; key: "controls"; onClicked: notch.act("open_controls") }
                 TabIcon { glyph: ""; key: "apps"; onClicked: notch.setMode("apps") }
-                TabIcon { glyph: ""; key: "menu"; onClicked: notch.setMode("music") }
+                TabIcon { glyph: ""; key: "menu"; onClicked: notch.setMode("menu") }
             }
 
             // ---- expanded: eyes capsule + title (page 0) / about (page 1) ----
@@ -674,6 +674,87 @@ Window {
                 Text { x: th.flare + 20; y: 232; width: parent.width - 2 * th.flare - 40; elide: Text.ElideRight
                     text: widgets.nextReminder !== "" ? "Next reminder: " + widgets.nextReminder : "No reminders coming up."
                     color: th.text3; font.family: th.font; font.pixelSize: 11 }
+            }
+
+            // ---- TELEPROMPTER ----
+            Item {
+                visible: win.mode === "prompter"; anchors.fill: parent
+                readonly property real tx: th.flare + 24
+                readonly property real tw: parent.width - 2 * (th.flare + 24)
+                Text { x: parent.tx; y: 14; width: parent.tw; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
+                    text: prompter.view.prev; color: "#5E5E66"; font.family: th.font; font.pixelSize: 13 }
+                Text { x: parent.tx; y: 34; width: parent.tw; height: 32; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                    fontSizeMode: Text.Fit; minimumPixelSize: 14; font.pixelSize: 23; font.weight: Font.DemiBold; font.family: th.font
+                    text: prompter.view.done ? "The end." : prompter.view.cur; color: "#FFFFFF" }
+                Text { x: parent.tx; y: 72; width: parent.tw; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
+                    text: prompter.view.next; color: "#9A9AA3"; font.family: th.font; font.pixelSize: 16 }
+                Text { x: parent.tx; y: 98; width: parent.tw; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
+                    text: prompter.view.next2; color: "#5E5E66"; font.family: th.font; font.pixelSize: 13 }
+                Rectangle { x: parent.tx; y: 128; width: parent.tw; height: 3; radius: 1.5; color: "#26262C"
+                    Rectangle { width: parent.width * prompter.view.progress; height: 3; radius: 1.5; color: th.accent } }
+                Row { anchors.horizontalCenter: parent.horizontalCenter; y: 138; spacing: 10
+                    Rectangle { width: 34; height: 28; radius: 14; color: "#1E1E24"
+                        Text { anchors.centerIn: parent; text: ""; font.family: th.icons; font.pixelSize: 12; color: th.text1 }
+                        MouseArea { anchors.fill: parent; onClicked: prompter.restart() } }
+                    Rectangle { width: 46; height: 28; radius: 14; color: th.text1
+                        Text { anchors.centerIn: parent; text: prompter.view.running ? "" : ""; font.family: th.icons; font.pixelSize: 13; color: "#000" }
+                        MouseArea { anchors.fill: parent; onClicked: prompter.toggle() } }
+                    Rectangle { width: 28; height: 28; radius: 14; color: "#1E1E24"
+                        Text { anchors.centerIn: parent; text: "−"; font.pixelSize: 16; color: th.text1 }
+                        MouseArea { anchors.fill: parent; onClicked: prompter.slower() } }
+                    Text { width: 64; height: 28; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                        text: prompter.view.wpm + " wpm"; color: th.text2; font.family: th.font; font.pixelSize: 11 }
+                    Rectangle { width: 28; height: 28; radius: 14; color: "#1E1E24"
+                        Text { anchors.centerIn: parent; text: "+"; font.pixelSize: 16; color: th.text1 }
+                        MouseArea { anchors.fill: parent; onClicked: prompter.faster() } }
+                    Rectangle { width: 34; height: 28; radius: 14; color: "#2A1B1B"
+                        Text { anchors.centerIn: parent; text: "✕"; font.pixelSize: 11; color: th.bad }
+                        MouseArea { anchors.fill: parent; onClicked: prompter.close() } }
+                }
+            }
+
+            // ---- MENU (favourite sites, music, teleprompter, settings, guide) ----
+            Item {
+                visible: win.mode === "menu"; anchors.fill: parent
+                Text { x: th.flare + 20; y: 16; text: "FAVOURITE SITES"; color: th.text3; font.family: th.font; font.pixelSize: 10; font.weight: Font.Bold }
+                Flow {
+                    x: th.flare + 20; y: 36; width: parent.width - 2 * (th.flare + 20); spacing: 8
+                    Repeater {
+                        model: menu.sites
+                        delegate: Rectangle {
+                            required property var modelData
+                            height: 30; radius: 15; width: chipLbl.implicitWidth + 28
+                            color: cm.containsMouse ? "#26262C" : "#1A1A1F"
+                            Text { id: chipLbl; anchors.centerIn: parent; text: modelData.label; color: th.text1; font.family: th.font; font.pixelSize: 12 }
+                            MouseArea { id: cm; anchors.fill: parent; hoverEnabled: true; onClicked: menu.openSite(modelData.id) }
+                        }
+                    }
+                    Text { visible: menu.sites.length === 0; text: "Add favourite sites in Settings."; color: th.text3; font.family: th.font; font.pixelSize: 12 }
+                }
+                Row {
+                    x: th.flare + 20; y: 92; spacing: 8
+                    Repeater {
+                        model: [{ t: "Teleprompter", g: "", a: 0 }, { t: "Now playing", g: "", a: 1 }, { t: "Settings", g: "", a: 2 }]
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: 160; height: 56; radius: 16; color: bm.containsMouse ? "#24242A" : "#1A1A1F"
+                            scale: bm.pressed ? 0.97 : 1
+                            Behavior on scale { NumberAnimation { duration: 80 } }
+                            Text { x: 16; anchors.verticalCenter: parent.verticalCenter; text: modelData.g; font.family: th.icons; font.pixelSize: 20; color: th.accent }
+                            Text { x: 52; anchors.verticalCenter: parent.verticalCenter; text: modelData.t; color: th.text1; font.family: th.font; font.pixelSize: 13; font.weight: Font.Medium }
+                            MouseArea { id: bm; anchors.fill: parent; hoverEnabled: true
+                                onClicked: modelData.a === 0 ? menu.startPrompter() : (modelData.a === 1 ? menu.openMusic() : notch.act("open_settings")) }
+                        }
+                    }
+                }
+                Column {
+                    x: th.flare + 20; y: 168; spacing: 5; width: parent.width - 2 * (th.flare + 20)
+                    Repeater { model: menu.guide
+                        delegate: Text { required property string modelData; width: parent.width; elide: Text.ElideRight; text: "•  " + modelData
+                            color: th.text3; font.family: th.font; font.pixelSize: 11 } }
+                }
+                Text { visible: prompter.message !== ""; x: th.flare + 20; y: 152; width: parent.width - 2 * (th.flare + 20); elide: Text.ElideRight
+                    text: prompter.message; color: th.warn; font.family: th.font; font.pixelSize: 11 }
             }
 
             // ---- MUSIC ----

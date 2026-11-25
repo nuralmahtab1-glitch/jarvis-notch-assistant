@@ -29,7 +29,7 @@ DEFAULT_SETTINGS = {
     "greeting": True,
     "lyrics": True,
     "shelf_enabled": True,
-    "awake_display": False, "awake_claude": True, "awake_focus": False,
+    "awake_display": False, "awake_claude": True, "awake_focus": False, "prompter_wpm": 140,
     "clocks": ["London=Europe/London", "New York=America/New_York", "Tokyo=Asia/Tokyo"],
     "weather_city": "", "weather_place": "", "weather_lat": None, "weather_lon": None, "weather_units": "C",
     "onboarded": False,
