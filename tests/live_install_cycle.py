@@ -46,12 +46,19 @@ log = tmp / "appdata" / "Jarvis" / "jarvis.log"
 text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
 bad = [l for l in text.splitlines() if any(w in l for w in ("Traceback", "[wake]", "[tts]", "[stt]", "Error", "failed"))]
 check("no errors in the app's log (voice, wake word, speech model all loaded)", not bad, ("\n   " + "\n   ".join(bad[:6])) if bad else "")
-try:
-    import psutil
-    p = psutil.Process(app.pid); mb = sum(c.memory_info().rss for c in [p] + p.children(recursive=True)) / 1e6
-    print(f"   memory in use: {mb:.0f} MB")
-except Exception:
-    pass
+def memory(label):
+    try:
+        import psutil
+        p = psutil.Process(app.pid)
+        procs = [p] + p.children(recursive=True)
+        parts = ", ".join(f"{c.name()} {c.memory_info().rss / 1e6:.0f}" for c in procs)
+        uss = sum(getattr(c.memory_full_info(), "uss", 0) for c in procs) / 1e6
+        print(f"   memory {label}: rss-sum {sum(c.memory_info().rss for c in procs) / 1e6:.0f} MB | unique (uss) {uss:.0f} MB | {parts}")
+    except Exception as e:
+        print("   memory probe failed:", e)
+memory("at 35 s")
+time.sleep(25)
+memory("at 60 s (steady state)")
 # connect Claude Code on the temp home, confirm the installed hook path is used, then disconnect through the app itself
 sys.path.insert(0, str(ROOT))
 r = subprocess.run([str(dest / "Jarvis.exe"), "--disconnect-claude"], env=env, timeout=60)
@@ -62,8 +69,12 @@ except Exception: app.kill()
 
 # uninstall (keep data), then verify
 r = subprocess.run([str(dest / "Jarvis.exe"), "--uninstall", "--silent"], env=env, timeout=120)
-time.sleep(6)
-check("uninstall removed the program folder", not dest.exists())
+t0 = time.time()
+while dest.exists() and time.time() - t0 < 25:
+    time.sleep(0.5)
+gone = not dest.exists()
+left = [str(f.relative_to(dest)) for f in dest.rglob("*") if f.is_file()] if dest.exists() else []
+check("uninstall removed the program folder", gone, f"(took {time.time() - t0:.1f}s)" if gone else f"still {len(left)} files after 25 s, e.g. {left[:3]}")
 check("uninstall removed the Add/Remove Programs entry", not reg_exists())
 check("uninstall kept your data by default", (tmp / "appdata" / "Jarvis" / "settings.json").exists())
 check("your Claude settings are exactly as before", json.loads((home / ".claude" / "settings.json").read_text()) == json.loads(settings_before))

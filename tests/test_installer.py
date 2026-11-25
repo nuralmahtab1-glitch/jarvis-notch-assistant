@@ -123,3 +123,40 @@ def test_uninstall_keeps_data_by_default_and_schedules_folder_removal(tmp_path, 
 def test_uninstall_can_be_declined(monkeypatch):
     monkeypatch.setattr(un, "ask_yes_no", lambda *a: False)
     assert un.run(silent=False) == 1
+
+
+def test_removal_script_deletes_the_folder_and_itself(tmp_path):
+    import subprocess, time
+    target = tmp_path / "Jarvis"; (target / "_internal" / "deep").mkdir(parents=True)
+    for i in range(20):
+        (target / "_internal" / "deep" / f"f{i}.dll").write_text("x")
+    bat = tmp_path / "rm.bat"; bat.write_text(un.removal_script(target), encoding="utf-8")
+    subprocess.run(["cmd", "/c", str(bat)], timeout=60, creationflags=0x08000000)
+    time.sleep(0.5)
+    assert not target.exists() and not bat.exists()
+
+
+def test_removal_script_retries_when_a_file_is_briefly_locked(tmp_path):
+    """Windows refuses to delete a file that is open elsewhere (antivirus scans do this). The script must keep trying."""
+    import subprocess, threading, time
+    target = tmp_path / "Jarvis"; target.mkdir()
+    locked = target / "busy.dll"; locked.write_text("x")
+    handle = open(locked, "rb")                                         # holds the file open: deletion fails until released
+    threading.Timer(4.0, handle.close).start()                          # released after ~4 s: the 2nd or 3rd attempt succeeds
+    bat = tmp_path / "rm.bat"; bat.write_text(un.removal_script(target), encoding="utf-8")
+    t = time.time()
+    subprocess.run(["cmd", "/c", str(bat)], timeout=90, creationflags=0x08000000)
+    assert not target.exists(), "the uninstaller gave up while the file was still locked"
+    assert time.time() - t > 3.5                                        # proves it really did have to retry
+
+
+def test_removal_script_gives_up_after_the_retry_limit(tmp_path):
+    import subprocess
+    target = tmp_path / "Jarvis"; target.mkdir(); f = target / "stuck.dll"; f.write_text("x")
+    handle = open(f, "rb")
+    try:
+        bat = tmp_path / "rm.bat"; bat.write_text(un.removal_script(target, tries=2), encoding="utf-8")
+        subprocess.run(["cmd", "/c", str(bat)], timeout=60, creationflags=0x08000000)
+        assert target.exists()                                          # it stops rather than looping forever
+    finally:
+        handle.close()

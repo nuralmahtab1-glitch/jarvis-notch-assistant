@@ -52,6 +52,23 @@ def remove_registry() -> None:
         pass
 
 
+def removal_script(target: Path, tries: int = 8) -> str:
+    """Batch file that deletes `target`, retrying if something still holds a file, then deletes itself."""
+    lines = [
+        "@echo off",
+        "set /a n=0",
+        ":retry",
+        "ping 127.0.0.1 -n 3 >nul",
+        f'rmdir /s /q "{target}" 2>nul',
+        f'if not exist "{target}" goto done',
+        "set /a n+=1",
+        f"if %n% lss {tries} goto retry",
+        ":done",
+        '(goto) 2>nul & del "%~f0"',
+    ]
+    return "\r\n".join(lines) + "\r\n"
+
+
 def run(silent: bool = False, delete_data: bool | None = None) -> int:
     from app.claude_bridge import installer
     from app.store.db import data_dir
@@ -79,13 +96,10 @@ def run(silent: bool = False, delete_data: bool | None = None) -> int:
         for d in (data_dir(), paths.user_models().parent):
             shutil.rmtree(d, ignore_errors=True)
 
-    # the install folder is deleted by a helper after we exit
+    # the install folder is deleted by a helper after we exit (retrying: antivirus or a slow disk can hold a file briefly)
     target = paths.install_dir()
     bat = Path(tempfile.gettempdir()) / "jarvis-uninstall.bat"
-    bat.write_text(
-        "@echo off\r\nping 127.0.0.1 -n 3 >nul\r\n"
-        f'rmdir /s /q "{target}"\r\n'
-        '(goto) 2>nul & del "%~f0"\r\n', encoding="utf-8")
+    bat.write_text(removal_script(target), encoding="utf-8")
     subprocess.Popen(["cmd", "/c", str(bat)], creationflags=0x08000000 | 0x00000008, close_fds=True)
     if not silent:
         ctypes.windll.user32.MessageBoxW(0, f"{config.APP_NAME} was removed.\n\n{config.CREDIT}", f"{config.APP_NAME}", 0x40)
