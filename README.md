@@ -24,7 +24,7 @@ cd jarvis
 First launch downloads nothing by itself: the speech model (`faster-whisper base.en`, ~150 MB) is fetched the
 first time it is needed, and the British voice (Piper `en_GB-alan-medium`) lives in `models/piper/`.
 
-Tray icon menu: About, Connect/Disconnect Claude Code, Do not disturb, Speak replies, Start with Windows,
+Tray icon menu: **Settings...**, About, Download/Remove AI brain, Connect/Disconnect Claude Code, Do not disturb, Speak replies, Start with Windows,
 Cycle demo states, Sleep, Quit.
 
 ## Using it
@@ -58,6 +58,15 @@ file up first, keeps your own hooks, and tags its entries so **Disconnect** remo
 - Hooks call a tiny stdlib-only helper (`app/claude_bridge/hook.py`) that talks to a loopback-only, token-protected
   local server. If Jarvis is not running the helper exits silently and instantly.
 
+## Settings
+
+Tray icon -> **Settings...** (or `run.py --settings`; tests: `tests/live_settings_clicks.py` clicks it with a simulated mouse). Seven pages: General (name, start with Windows, sleep time,
+Do not disturb, greeting), Voice (when to speak, personality, speed + preview), Listening (wake word, command and
+dictate keys, microphone, speech model), AI brain (status, model, download/remove), Claude Code (connect, approval
+timeout, privacy, spoken updates), Privacy (lyrics, export, erase, reset) and About. Most changes apply
+immediately; keys, microphone, speech model and the Claude bridge show a "restart" notice. Destructive buttons
+(erase, reset) ask twice. Do Not Disturb holds reminders instead of losing them, and fires them when it ends.
+
 ## The AI brain (local, optional)
 
 Tray menu **Download AI brain (1.1 GB)** (or pick it in the setup tour) installs `llama.cpp` and **Qwen3 1.7B**
@@ -88,8 +97,7 @@ now-playing + synced lyrics, tray menu, 17-step onboarding.
 
 **Not built yet:**
 - A full **Models page** for cloud providers / API keys (the local brain below is built).
-- **Models page** (add local/cloud models, API keys), **Settings window** (settings live in
-  `%APPDATA%\Jarvis\settings.json`).
+- Adding your own models by file or Ollama name (the Settings window lists the built-in Qwen3 models only).
 - **Controls / Shelf / Apps** panels, world clocks, weather, teleprompter. Their tab icons show tooltips only.
 - Wi-Fi / Bluetooth / night-light toggles (the assistant says it can't yet).
 - **Browser extension** for claude.ai/code, and a Windows **installer**.

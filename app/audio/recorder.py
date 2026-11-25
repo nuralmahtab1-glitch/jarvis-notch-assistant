@@ -52,6 +52,16 @@ class Recorder:
         return audio
 
 
+def device_index(name: str):
+    """Map a saved device name to a sounddevice index (None = system default)."""
+    if not name or name == "Default microphone":
+        return None
+    for i, n in list_input_devices():
+        if n == name:
+            return i
+    return None
+
+
 def list_input_devices() -> list[tuple[int, str]]:
     import sounddevice as sd
     return [(i, d["name"]) for i, d in enumerate(sd.query_devices()) if d["max_input_channels"] > 0]

@@ -28,7 +28,7 @@ class Assistant(QObject):
         self.speaker, self.stt = speaker, transcriber
         self._recorder_factory = recorder_factory
         self.rec = None
-        self.persona = Persona("butler", settings["address"])
+        self.persona = Persona(settings["persona"], settings["address"])
         self.tracker = tracker
         self.brain, self.local = brain, local_backend
         self.brain_dl = {"id": None, "pct": 0, "state": ""}     # download status for the UI
@@ -356,15 +356,17 @@ class Assistant(QObject):
                 self.ctl.keepAwake(5)
             if left <= 0:
                 self._focus_end = 0
-                win.chime()
+                if not self.cfg["dnd"]:
+                    win.chime()
                 done_msg = "Break over. Back to it." if self._focus_label == "Break" else \
                     "Focus session complete. " + self.persona.say("break_hint")
                 self.say(done_msg.strip(), src="voice-timer" if False else "key", hold=4)
-        for r in self.store.reminders_due():
+        # Do not disturb holds reminders (they stay pending and fire when it ends); nothing is lost.
+        for r in ([] if self.cfg["dnd"] else self.store.reminders_due()):
             win.chime()
             self.ctl.wake()
             self.show_card("reminder", "Reminder", r["text"], seconds=25)
-            if self.speaker and not self.cfg["dnd"] and self.speak_mode != "off":
+            if self.speaker and self.speak_mode != "off":
                 self.speaker.speak(f"Reminder: {r['text']}.")
             self._last_reminder = r
         if self.tracker and self.ctl.mode == "claudeWorking":
@@ -481,6 +483,28 @@ class Assistant(QObject):
                 self.ctl.wake()
                 self.show_card("music", seconds=6)
         self.ui(peek)
+
+    # ------------------------------------------------------------------ settings helpers
+    def set_dnd(self, on: bool):
+        """Do not disturb: the notch sleeps and stays quiet (only 'needs you' still shows, silently)."""
+        self.ctl.dnd = on
+        if on:
+            if self.speaker:
+                self.speaker.stop()
+            self.ctl.setMode("sleeping")
+        else:
+            self.ctl.wake()
+
+    def greet_if_due(self):
+        """Say a short greeting the first time Jarvis starts each day (if enabled and not in DND)."""
+        today = time.strftime("%Y-%m-%d")
+        if not self.cfg["greeting"] or self.cfg["dnd"] or self.cfg["last_greeting"] == today:
+            return
+        self.cfg.set("last_greeting", today)
+        text = self.persona.greeting(datetime.now().hour)
+        if text:
+            self.ctl.wake()
+            self.say(text, src="key", hold=4)
 
     # ------------------------------------------------------------------ AI brain
     def brain_available(self) -> bool:

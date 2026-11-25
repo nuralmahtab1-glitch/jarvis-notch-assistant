@@ -31,6 +31,9 @@ DEFAULT_SETTINGS = {
     "onboarded": False,
     "stt_model": "base.en",
     "llm_model": "qwen3-1.7b",
+    "persona": "butler",
+    "mic_device": "Default microphone",
+    "last_greeting": "",
     "websites": ["youtube.com", "github.com", "gmail.com"],
 }
 

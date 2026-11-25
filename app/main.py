@@ -38,6 +38,8 @@ def main() -> int:
     ap.add_argument("--say", help="pretend you said this (no microphone), then keep running")
     ap.add_argument("--onboarding", action="store_true", help="show the first-run tour now")
     ap.add_argument("--onboarding-shots", help="write a PNG of every onboarding step into this folder, then quit")
+    ap.add_argument("--settings", action="store_true", help="open the Settings window at startup")
+    ap.add_argument("--settings-shots", help="write a PNG of every Settings page into this folder, then quit")
     ap.add_argument("--no-voice", action="store_true", help="do not load speech models or speak")
     ap.add_argument("--no-keys", action="store_true", help="do not install the push-to-talk keyboard hook")
     args = ap.parse_args()
@@ -47,7 +49,7 @@ def main() -> int:
     app.setQuitOnLastWindowClosed(False)
 
     lock = None
-    if not args.shots and not args.onboarding_shots:
+    if not args.shots and not args.onboarding_shots and not args.settings_shots:
         lock = QLockFile(QDir.temp().absoluteFilePath("jarvis-notch.lock"))
         lock.setStaleLockTime(0)
         if not lock.tryLock(100):
@@ -89,7 +91,8 @@ def main() -> int:
 
     # --- assistant (voice, tools, Claude Code bridge) ---
     assistant = None
-    if not args.shots and not args.demo and not args.onboarding_shots:
+    hooks: dict = {}
+    if not args.shots and not args.demo and not args.onboarding_shots and not args.settings_shots:
         import threading
         from app.store.db import Settings, Store
         from app.core.assistant import Assistant
@@ -113,7 +116,7 @@ def main() -> int:
                 app.aboutToQuit.connect(bridge.stop)
             except OSError as e:
                 print("[bridge]", e)
-        from app.audio.recorder import Recorder
+        from app.audio.recorder import Recorder, device_index
         from app.llm.brain import Brain
         from app.llm.server import LocalBackend
         local = LocalBackend(lambda: settings["llm_model"])
@@ -122,7 +125,7 @@ def main() -> int:
         if local.installed():
             threading.Thread(target=brain.warm, daemon=True).start()      # first question is then fast
         assistant = Assistant(ctl, settings, store, speaker, stt,
-                              recorder_factory=(lambda lvl: Recorder(on_level=lvl)) if not args.no_voice else None,
+                              recorder_factory=(lambda lvl: Recorder(on_level=lvl, device=device_index(settings["mic_device"]))) if not args.no_voice else None,
                               tracker=tracker, brain=brain, local_backend=local)
         if not args.no_keys and not args.no_voice:
             from app.winio.hotkey import HoldKey
@@ -142,19 +145,81 @@ def main() -> int:
             keys = HoldKey({settings["ptt_command_key"]: make("command"), settings["ptt_dictate_key"]: make("dictate")})
             keys.start()
             app.aboutToQuit.connect(keys.stop)
-        if settings["wake_word"] and not args.no_voice and not args.no_keys:
-            from app.wake.listener import WakeListener
-            wake = WakeListener(on_wake=lambda: assistant.begin_capture("command", "wake"),
-                                is_blocked=lambda: assistant.busy or bool(speaker and speaker.speaking))
-            wake.start()
-            app.aboutToQuit.connect(wake.stop)
+        wake_ref = {"w": None}
+
+        def set_wake(on: bool):
+            """Start or stop the always-on wake word listener (also called live from Settings)."""
+            if args.no_voice or args.no_keys:
+                return
+            if on and wake_ref["w"] is None:
+                from app.wake.listener import WakeListener
+                wake_ref["w"] = WakeListener(on_wake=lambda: assistant.begin_capture("command", "wake"),
+                                             is_blocked=lambda: assistant.busy or bool(speaker and speaker.speaking),
+                                             device=device_index(settings["mic_device"]))
+                wake_ref["w"].start()
+            elif not on and wake_ref["w"] is not None:
+                wake_ref["w"].stop()
+                wake_ref["w"] = None
+        set_wake(bool(settings["wake_word"]))
+        app.aboutToQuit.connect(lambda: set_wake(False))
+        hooks["wake"] = set_wake
         from app.winio.media import MediaWatcher
         media = MediaWatcher(assistant.on_media, assistant.on_track_change, lyrics=bool(settings["lyrics"]))
         media.start()
         app.aboutToQuit.connect(media.stop)
+        hooks["lyrics"] = lambda on: setattr(media, "use_lyrics", on)
+        if settings["onboarded"] and speaker and not args.say:
+            QTimer.singleShot(3000, assistant.greet_if_due)      # once per day
         if args.say:
             QTimer.singleShot(800, lambda: assistant.handle_text(args.say, "key"))
         app.assistant = assistant      # keep alive
+
+    # --- settings window ---
+    def open_settings(a, ctl_, settings_, store_, shots: str | None = None):
+        from app.ui.settings_ctl import SettingsController
+        from app.claude_bridge import installer
+        existing = getattr(app, "_settings", None)
+        if existing and not shots:
+            w = existing[2]
+            w.show(); w.raise_(); w.requestActivate()
+            return
+        try:
+            from app.audio.recorder import list_input_devices
+            mics = [n for _, n in list_input_devices()]
+        except Exception:
+            mics = []
+        sc = SettingsController(a, ctl_, settings_, store_, mics, hooks, installer)
+        eng = QQmlApplicationEngine()
+        eng.warnings.connect(lambda ws: [print("QML:", w.toString(), file=sys.stderr) for w in ws])
+        eng.rootContext().setContextProperty("sc", sc)
+        eng.load(QUrl.fromLocalFile(str(Path(__file__).parent / "ui" / "qml" / "Settings.qml")))
+        if not eng.rootObjects():
+            return
+        w = eng.rootObjects()[0]
+        app._settings = (eng, sc, w)
+        if shots:
+            qw = wrapInstance(getCppPointer(w)[0], QQuickWindow)
+            out = Path(shots); out.mkdir(parents=True, exist_ok=True)
+            i = {"n": 0}
+
+            def snap():
+                qw.grabWindow().save(str(out / f"settings_{i['n']}.png"))
+                i["n"] += 1
+                if i["n"] >= 7:
+                    return app.quit()
+                w.setProperty("page", i["n"]); QTimer.singleShot(700, snap)
+            QTimer.singleShot(900, snap)
+
+    if args.settings_shots:
+        from app.store.db import Settings, Store
+        from app.core.assistant import Assistant
+        import tempfile
+        d = Path(tempfile.mkdtemp())
+        s_ = Settings(d / "s.json")
+        a_ = Assistant(ctl, s_, Store(d / "t.db"))
+        open_settings(a_, ctl, s_, a_.store, args.settings_shots)
+    elif assistant and args.settings:
+        QTimer.singleShot(400, lambda: open_settings(assistant, ctl, assistant.cfg, assistant.store))
 
     # --- tray ---
     tray = QSystemTrayIcon(tray_icon(), app)
@@ -179,6 +244,8 @@ def main() -> int:
             "\n\nA local-first voice assistant that lives in your notch."
             f"\nSay \"{config.WAKE_PHRASE}\", or hold Right Ctrl to talk and Right Alt to dictate.")
 
+    if assistant:
+        act("Settings...", lambda: open_settings(assistant, ctl, assistant.cfg, assistant.store))
     act(f"About {config.APP_NAME}", show_about)
     menu.addSeparator()
     if assistant:

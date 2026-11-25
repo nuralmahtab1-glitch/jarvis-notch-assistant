@@ -1,0 +1,265 @@
+"""Settings controller: validates, saves and live-applies every setting. Made by Nur Al Mahtab."""
+from __future__ import annotations
+import json, os, time
+from pathlib import Path
+from PySide6.QtCore import QObject, Property, QTimer, Signal, Slot
+from app import config
+from app.core.persona import PRESETS
+from app.store.db import DEFAULT_SETTINGS
+
+KEY_CHOICES = ["right ctrl", "right alt", "right shift", "f8", "f9"]
+STT_CHOICES = ["tiny.en", "base.en", "small.en"]
+PERSONAS = list(PRESETS)
+SPEAK_CHOICES = ["off", "voice", "always"]
+
+# settings that only take effect after Jarvis restarts
+RESTART_KEYS = {"ptt_command_key", "ptt_dictate_key", "mic_device", "stt_model", "claude_bridge"}
+
+
+def clamp(v, lo, hi):
+    return max(lo, min(hi, v))
+
+
+class SettingsController(QObject):
+    changed = Signal()
+    toast = Signal(str)
+
+    def __init__(self, assistant, ctl, settings, store, mic_names: list[str] | None = None,
+                 hooks: dict | None = None, installer=None):
+        super().__init__()
+        self.a, self.ctl, self.cfg, self.store = assistant, ctl, settings, store
+        self.hooks = hooks or {}              # optional callbacks: wake(bool), lyrics(bool)
+        self.installer = installer
+        self._mics = ["Default microphone"] + (mic_names or [])
+        self._restart = False
+        self._msg = ""
+        self._poll = QTimer(self)
+        self._poll.setInterval(800)
+        self._poll.timeout.connect(self.changed.emit)   # live brain-download progress
+        self._poll.start()
+
+    # ---------------- read side ----------------
+    def _all(self) -> dict:
+        d = dict(self.cfg.data)
+        sp = d.get("claude_speak", {})
+        d.update(speak_done=bool(sp.get("done")), speak_needs=bool(sp.get("needs_you")), speak_error=bool(sp.get("error")))
+        return d
+
+    values = Property("QVariantMap", _all, notify=changed)
+    mics = Property("QStringList", lambda s: s._mics, constant=True)
+    keyChoices = Property("QStringList", lambda s: KEY_CHOICES, constant=True)
+    sttChoices = Property("QStringList", lambda s: STT_CHOICES, constant=True)
+    personas = Property("QStringList", lambda s: PERSONAS, constant=True)
+    speakChoices = Property("QStringList", lambda s: SPEAK_CHOICES, constant=True)
+    appName = Property(str, lambda s: config.APP_NAME, constant=True)
+    version = Property(str, lambda s: config.VERSION, constant=True)
+    credit = Property(str, lambda s: config.CREDIT, constant=True)
+    restartNeeded = Property(bool, lambda s: s._restart, notify=changed)
+    message = Property(str, lambda s: s._msg, notify=changed)
+
+    @Property(str, notify=changed)
+    def brainStatus(self) -> str:
+        from app.llm import manager
+        mid = self.cfg["llm_model"]
+        dl = getattr(self.a, "brain_dl", {"id": None, "state": "", "pct": 0})
+        if dl["id"] == mid and dl["state"] == "downloading":
+            return f"Downloading {dl['pct']}%"
+        if manager.is_installed(mid) and manager.server_binary():
+            return "Installed"
+        return "Not installed"
+
+    @Property("QVariantList", notify=changed)
+    def brainModels(self):
+        from app.llm import manager
+        return [{"id": m["id"], "name": f"{m['name']} ({m['size_gb']} GB)", "installed": manager.is_installed(m["id"])}
+                for m in manager.CATALOG]
+
+    @Property(bool, notify=changed)
+    def claudeConnected(self) -> bool:
+        return bool(self.installer and self.installer.is_connected())
+
+    # ---------------- write side ----------------
+    def _say(self, msg: str):
+        self._msg = msg
+        self.toast.emit(msg)
+        self.changed.emit()
+
+    @Slot(str, "QVariant")
+    def set(self, key: str, value):
+        """Validate, save and apply one setting. Unknown keys are ignored."""
+        if key not in DEFAULT_SETTINGS and key not in ("speak_done", "speak_needs", "speak_error"):
+            return
+        value = self._validate(key, value)
+        if value is None:
+            return
+        if key in ("speak_done", "speak_needs", "speak_error"):
+            sp = dict(self.cfg["claude_speak"])
+            sp[{"speak_done": "done", "speak_needs": "needs_you", "speak_error": "error"}[key]] = bool(value)
+            self.cfg.set("claude_speak", sp)
+        else:
+            self.cfg.set(key, value)
+        self._apply(key, value)
+        if key in RESTART_KEYS:
+            self._restart = True
+        self.changed.emit()
+
+    def _validate(self, key, v):
+        try:
+            if key in ("wake_word", "dnd", "greeting", "claude_bridge", "claude_hide_details",
+                       "claude_quiet_when_focused", "lyrics", "speak_done", "speak_needs", "speak_error"):
+                return bool(v)
+            if key == "address":
+                v = str(v).strip()[:40]
+                return v or None
+            if key == "speak_replies":
+                return v if v in SPEAK_CHOICES else None
+            if key == "persona":
+                return v if v in PERSONAS else None
+            if key == "voice_speed":
+                return round(clamp(float(v), 0.8, 1.4), 2)
+            if key == "sleep_after_minutes":
+                return int(clamp(int(float(v)), 1, 120))
+            if key == "claude_approval_timeout":
+                return int(clamp(int(float(v)), 5, 120))
+            if key in ("ptt_command_key", "ptt_dictate_key"):
+                if v not in KEY_CHOICES:
+                    return None
+                other = self.cfg["ptt_dictate_key" if key == "ptt_command_key" else "ptt_command_key"]
+                if v == other:
+                    self._say("Command and Dictate need two different keys.")
+                    return None
+                return v
+            if key == "stt_model":
+                return v if v in STT_CHOICES else None
+            if key == "llm_model":
+                from app.llm import manager
+                return v if any(m["id"] == v for m in manager.CATALOG) else None
+            if key == "mic_device":
+                return str(v) if str(v) in self._mics else None
+            if key == "websites":
+                return [str(x).strip() for x in v if str(x).strip()][:12]
+        except (TypeError, ValueError):
+            return None
+        return v
+
+    def _apply(self, key, v):
+        a = self.a
+        if key == "address":
+            a.persona.name = v
+            if a.brain:
+                a.brain.name = v
+        elif key == "persona":
+            a.persona.preset = v
+        elif key == "voice_speed" and a.speaker:
+            a.speaker.speed = v
+        elif key == "sleep_after_minutes" and not os.environ.get("JARVIS_SLEEP_SECONDS"):
+            self.ctl._sleep_after = v * 60
+        elif key == "dnd":
+            a.set_dnd(v)
+        elif key == "claude_hide_details" and a.tracker:
+            a.tracker.hide_details = v
+        elif key == "claude_approval_timeout" and a.tracker:
+            a.tracker.approval_timeout = v
+        elif key == "claude_quiet_when_focused" and a.tracker:
+            a.tracker.quiet_when_focused = v
+        elif key == "wake_word" and "wake" in self.hooks:
+            self.hooks["wake"](v)
+        elif key == "lyrics" and "lyrics" in self.hooks:
+            self.hooks["lyrics"](v)
+        elif key == "llm_model" and a.local:
+            a.local.stop()                       # next question loads the newly chosen model
+
+    # ---------------- actions ----------------
+    @Slot(bool)
+    def setAutostart(self, on: bool):
+        from app.winio import autostart
+        try:
+            autostart.set_enabled(on)
+        except OSError as e:
+            self._say(f"Could not change startup: {e}")
+
+    @Slot(result=bool)
+    def autostartOn(self) -> bool:
+        from app.winio import autostart
+        return autostart.is_enabled()
+
+    @Slot()
+    def previewVoice(self):
+        if self.a.speaker:
+            self.a.speaker.speak(self.a.persona.greeting(time.localtime().tm_hour))
+
+    @Slot()
+    def connectClaude(self):
+        if not self.installer:
+            return
+        try:
+            b = self.installer.connect()
+            self._say("Claude Code connected." + (f" Backup saved as {b.name}." if b else ""))
+        except Exception as e:
+            self._say(f"Could not connect: {e}")
+
+    @Slot()
+    def disconnectClaude(self):
+        if not self.installer:
+            return
+        try:
+            self.installer.disconnect()
+            self._say("Claude Code disconnected. Your other hooks were left alone.")
+        except Exception as e:
+            self._say(f"Could not disconnect: {e}")
+
+    @Slot()
+    def downloadBrain(self):
+        self.a.install_brain(self.cfg["llm_model"])
+        self.changed.emit()
+
+    @Slot()
+    def removeBrain(self):
+        from app.llm import manager
+        if self.a.local:
+            self.a.local.stop()
+        manager.remove(self.cfg["llm_model"])
+        self._say("AI brain removed. Commands still work without it.")
+
+    @Slot(result=str)
+    def exportData(self) -> str:
+        """Write everything Jarvis keeps about you (settings, list, reminders) to a readable JSON file."""
+        data = {"exported": time.strftime("%Y-%m-%d %H:%M:%S"), "settings": self.cfg.data,
+                "todos": self.store.todo_list(), "reminders": self.store.reminders_pending()}
+        folder = Path.home() / "Documents"
+        folder.mkdir(exist_ok=True)
+        path = folder / time.strftime("Jarvis-export-%Y%m%d-%H%M%S.json")
+        path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+        self._say(f"Saved to {path}")
+        return str(path)
+
+    @Slot()
+    def wipeData(self):
+        self.store.wipe()
+        self.a.refresh_todo()
+        self._say("Your list, reminders and shelf were erased. Settings were kept.")
+
+    @Slot()
+    def resetSettings(self):
+        for k, v in DEFAULT_SETTINGS.items():
+            if k != "onboarded":
+                self.cfg.data[k] = v if not isinstance(v, (dict, list)) else json.loads(json.dumps(v))
+        self.cfg.save()
+        self._apply("persona", self.cfg["persona"])
+        self._apply("voice_speed", self.cfg["voice_speed"])
+        self._apply("dnd", self.cfg["dnd"])
+        self._restart = True
+        self._say("Settings were reset to their defaults.")
+
+    @Slot()
+    def openFolder(self):
+        from app.store.db import data_dir
+        try:
+            os.startfile(str(data_dir()))
+        except OSError as e:
+            self._say(f"Could not open the folder: {e}")
+
+    @Slot()
+    def clearMessage(self):
+        self._msg = ""
+        self.changed.emit()
