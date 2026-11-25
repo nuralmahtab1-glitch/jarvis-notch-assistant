@@ -37,7 +37,7 @@ Window {
 
     readonly property string mode: notch.mode
     readonly property bool isTiny: mode === "idle" || mode === "sleeping" || mode === "peek"
-    readonly property bool isPanel: mode === "expanded" || mode === "music" || mode === "focus" || mode === "todo" || mode === "controls" || mode === "shelf"
+    readonly property bool isPanel: mode === "expanded" || mode === "music" || mode === "focus" || mode === "todo" || mode === "controls" || mode === "shelf" || mode === "apps"
     readonly property bool isCard: mode === "confirm" || mode === "claudeNeeds" || mode === "reminder" || mode === "claudeDone" || mode === "answer"
     readonly property bool isCompact: !isTiny && !isPanel && !isCard
     readonly property bool sleeping: mode === "sleeping"
@@ -105,8 +105,8 @@ Window {
         // Dragging a file or text onto the notch opens the shelf; dropping parks it there.
         DropArea {
             anchors.fill: parent
-            onEntered: (d) => { if (notch.mode !== "shelf") { shelf.opened(); notch.setMode("shelf") } }
-            onDropped: (d) => { if (d.hasUrls) shelf.dropUrls(d.urls); else if (d.hasText) shelf.dropText(d.text); d.accept() }
+            onEntered: (d) => { if (notch.mode !== "shelf" && notch.mode !== "apps") { shelf.opened(); notch.setMode("shelf") } }
+            onDropped: (d) => { if (notch.mode === "apps") { if (d.hasUrls) apps.dropUrls(d.urls) } else if (d.hasUrls) shelf.dropUrls(d.urls); else if (d.hasText) shelf.dropText(d.text); d.accept() }
         }
         scale: sleeping ? sleepPulse.v : 1.0
         transformOrigin: Item.Top
@@ -307,7 +307,7 @@ Window {
                 TabIcon { glyph: ""; key: "widgets"; onClicked: notch.setMode("todo") }
                 TabIcon { glyph: ""; key: "shelf"; onClicked: { shelf.opened(); notch.setMode("shelf") } }
                 TabIcon { glyph: ""; key: "controls"; onClicked: notch.act("open_controls") }
-                TabIcon { glyph: ""; key: "apps" }
+                TabIcon { glyph: ""; key: "apps"; onClicked: notch.setMode("apps") }
                 TabIcon { glyph: ""; key: "menu"; onClicked: notch.setMode("music") }
             }
 
@@ -561,6 +561,59 @@ Window {
                     font.family: th.font; font.pixelSize: 12 }
                 Text { anchors.right: parent.right; anchors.rightMargin: th.flare + 20; y: 223; text: "Memory only. Never saved."
                     color: th.text3; font.family: th.font; font.pixelSize: 10 }
+            }
+
+            // ---- APPS (pinned app launcher) ----
+            Item {
+                visible: win.mode === "apps"; anchors.fill: parent
+                Flickable {
+                    id: appsFlick
+                    x: th.flare + 14; y: 12; width: parent.width - 2 * th.flare - 28; height: 190
+                    clip: true; contentHeight: appsGrid.height + 4; boundsBehavior: Flickable.StopAtBounds
+                    Grid {
+                        id: appsGrid; columns: 6; spacing: 4
+                        Repeater {
+                            model: apps.items
+                            delegate: Rectangle {
+                                id: acell
+                                required property var modelData
+                                width: 78; height: 88; radius: 14
+                                color: am.containsMouse ? "#1E1E24" : "transparent"
+                                scale: am.pressed ? 0.95 : 1
+                                Behavior on scale { NumberAnimation { duration: 80 } }
+                                // the app's real icon, or a lettered badge when Windows gives us none (e.g. Settings)
+                                Item { x: 19; y: 8; width: 40; height: 40
+                                    Image { anchors.fill: parent; visible: acell.modelData.icon !== ""; source: acell.modelData.icon
+                                        sourceSize: Qt.size(40, 40); smooth: true; fillMode: Image.PreserveAspectFit }
+                                    Rectangle { anchors.fill: parent; visible: acell.modelData.icon === ""; radius: 10; color: "#24242A"
+                                        Text { anchors.centerIn: parent; text: acell.modelData.letter; color: th.text1
+                                            font.family: th.font; font.pixelSize: 18; font.weight: Font.DemiBold } } }
+                                Text { x: 4; y: 52; width: parent.width - 8; height: 30; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
+                                    wrapMode: Text.WordWrap; maximumLineCount: 2; lineHeight: 0.9
+                                    text: acell.modelData.name; color: am.containsMouse ? th.text1 : th.text2
+                                    font.family: th.font; font.pixelSize: 11 }
+                                MouseArea { id: am; anchors.fill: parent; hoverEnabled: true; onClicked: apps.launch(acell.modelData.id) }
+                                // unpin (shows on hover)
+                                Rectangle { visible: am.containsMouse || xm.containsMouse; x: parent.width - 22; y: 4; width: 18; height: 18; radius: 9
+                                    color: xm.containsMouse ? th.bad : "#33333A"
+                                    Text { anchors.centerIn: parent; text: "✕"; font.pixelSize: 8; color: "#fff" }
+                                    MouseArea { id: xm; anchors.fill: parent; hoverEnabled: true; onClicked: apps.remove(acell.modelData.id) } }
+                            }
+                        }
+                        // the "+" tile: pick a program to pin
+                        Rectangle {
+                            width: 78; height: 88; radius: 14; color: pm2.containsMouse ? "#1E1E24" : "transparent"
+                            Rectangle { x: 19; y: 8; width: 40; height: 40; radius: 10; color: "transparent"; border.color: th.text3; border.width: 1.5
+                                Text { anchors.centerIn: parent; text: "+"; color: th.text2; font.pixelSize: 22 } }
+                            Text { x: 4; y: 52; width: parent.width - 8; horizontalAlignment: Text.AlignHCenter; text: "Pin an app"
+                                color: th.text3; font.family: th.font; font.pixelSize: 11 }
+                            MouseArea { id: pm2; anchors.fill: parent; hoverEnabled: true; onClicked: apps.addDialog() }
+                        }
+                    }
+                }
+                Text { x: th.flare + 20; y: 222; width: 300; elide: Text.ElideRight; text: apps.message !== "" ? apps.message : "Drop a program or shortcut here to pin it."
+                    color: apps.message !== "" ? th.accent : th.text3; font.family: th.font; font.pixelSize: 11 }
+                Pill { anchors.right: parent.right; anchors.rightMargin: th.flare + 20; y: 216; label: "Reset"; fg: th.text2; bg: "#1A1A1F"; onClicked: apps.reset() }
             }
 
             // ---- MUSIC ----

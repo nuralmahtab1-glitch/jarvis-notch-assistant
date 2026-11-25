@@ -80,6 +80,19 @@ file up first, keeps your own hooks, and tags its entries so **Disconnect** remo
 - Hooks call a tiny stdlib-only helper (`app/claude_bridge/hook.py`) that talks to a loopback-only, token-protected
   local server. If Jarvis is not running the helper exits silently and instantly.
 
+## Apps (a launcher in the notch)
+
+The grid icon opens your **pinned apps** (or say "show my apps"). The first time, it pins Explorer, Notepad,
+Calculator, Settings and whichever of Chrome, Edge, VS Code, Discord, Word, Excel, PowerPoint, Spotify, Steam, OBS,
+Slack and Zoom it finds in your Start menu. Each shows its real icon. Click to launch; hover to unpin (x); the **+**
+tile opens a file picker; or **drop a program or shortcut** on the panel to pin it. Reset restores the defaults.
+Only programs and shortcuts (`.exe .lnk .url .bat .cmd`) can be pinned.
+
+Voice: "open photoshop", "open vs code" finds anything in your Start menu (pinned apps first). Well-known names
+(notepad, calculator, terminal...) keep their exact Windows mapping, so a similarly named program can never hijack them.
+Default pins use strict matching on purpose: a wrong guess (for example pinning a trading "Terminal" as Windows
+Terminal) is worse than no pin.
+
 ## Shelf (clipboard history + parked files)
 
 Hover the notch and use the tab icon, say "show my shelf", or **drag a file or text onto the notch** (it opens
@@ -147,7 +160,7 @@ now-playing + synced lyrics, tray menu, 17-step onboarding.
 **Not built yet:**
 - A full **Models page** for cloud providers / API keys (the local brain below is built).
 - Adding your own models by file or Ollama name (the Settings window lists the built-in Qwen3 models only).
-- **Apps** panel, world clocks, weather, teleprompter. Their tab icons show tooltips only.
+- World clocks, weather and the teleprompter (their tab-icon tooltips exist, the features don't).
 - Dragging an item **out of** the Shelf into another app uses Qt's native drag, which I could not exercise
   automatically (dropping *in* is tested with synthesized events). Click to copy and the Paste button are tested.
 - A real on/off switch for **night light, battery saver and accessibility**: Windows gives apps no supported way to
@@ -161,7 +174,7 @@ now-playing + synced lyrics, tray menu, 17-step onboarding.
 ## Tests
 
 ```powershell
-.venv\Scripts\python.exe -m pytest tests -q     # 200 tests
+.venv\Scripts\python.exe -m pytest tests -q     # 227 tests
 ```
 
 Live checks (need a real screen/speakers): `tests/live_winio_check.py`, `tests/live_voice_roundtrip.py`,

@@ -43,6 +43,7 @@ class Assistant(QObject):
         self._focus_total = 0
         self._focus_label = "Focus"
         self._claude_seen: dict[str, str] = {}
+        self.apps = None                   # set by main: the pinned apps (voice 'open <app>')
         self.shelf = None                  # set by main: the Shelf controller
         self.qs = qs                       # quick-settings backend (swappable in tests)
         self._ctl_tick = 0
@@ -74,7 +75,7 @@ class Assistant(QObject):
         m = self.speak_mode
         return m == "always" or (m == "voice" and src in ("key", "wake"))
 
-    CARD_MODES = ("todo", "volume", "focus", "music", "controls", "shelf")
+    CARD_MODES = ("todo", "volume", "focus", "music", "controls", "shelf", "apps")
 
     def say(self, text: str, src: str = "key", mode: str = "done", hold: float = 2.6):
         """Show the reply in the notch and speak it if the interaction was by voice.
@@ -305,7 +306,14 @@ class Assistant(QObject):
             if it.name == "screenshot":
                 path = win.screenshot(); return "Screenshot saved to your Pictures folder."
             if it.name == "open_app":
+                key = a["name"].lower().strip()
+                if self.apps and key not in win.APP_ALIASES:      # well-known names (notepad, terminal...) keep their exact mapping
+                    hit = self.apps.launch_by_name(a["name"])
+                    if hit:
+                        return f"Opening {hit}."
                 return f"Opening {a['name']}." if win.open_app(a["name"]) else f"I could not open {a['name']}."
+            if it.name == "apps_open":
+                self.ctl.wake(); self.ctl.setMode("apps"); return ""
             if it.name == "open_website":
                 win.open_url(a["url"]); return "Opening it now."
             if it.name == "search_web":

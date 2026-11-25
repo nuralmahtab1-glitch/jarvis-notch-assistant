@@ -60,10 +60,19 @@ def main() -> int:
     ctl = NotchController(demo_text=bool(args.demo or args.shots))
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("notch", ctl)
+    from app.store.db import Settings
+    from app.core.apps import PinnedApps, start_menu_index
+    from app.ui.apps_ctl import AppsController
+    import tempfile
     from app.ui.shelf_ctl import ShelfController
+    preview = bool(args.shots or args.demo or args.onboarding_shots or args.settings_shots)
+    settings = Settings(Path(tempfile.mkdtemp()) / "s.json") if preview else Settings()   # ONE shared settings object
+    pins = PinnedApps(settings, start_menu_index(), launcher=(lambda t: None) if preview else None)
+    apps_ctl = AppsController(ctl, pins)
     from app.winio import system as winsys
     shelf_ctl = ShelfController(ctl, system=winsys, demo=bool(args.shots or args.demo))
     engine.rootContext().setContextProperty("shelf", shelf_ctl)
+    engine.rootContext().setContextProperty("apps", apps_ctl)
     engine.warnings.connect(lambda ws: [print("QML:", w.toString(), file=sys.stderr) for w in ws])
     engine.load(QUrl.fromLocalFile(str(QML)))
     if not engine.rootObjects():
@@ -103,7 +112,7 @@ def main() -> int:
         from app.store.db import Settings, Store
         from app.core.assistant import Assistant
         from app.claude_bridge.tracker import Bridge, Tracker
-        settings, store = Settings(), Store()
+        store = Store()
         ctl._sleep_after = settings["sleep_after_minutes"] * 60 if not os.environ.get("JARVIS_SLEEP_SECONDS") else ctl._sleep_after
         speaker = stt = None
         if not args.no_voice:
@@ -179,6 +188,7 @@ def main() -> int:
         hooks["shelf"] = shelf_ctl.set_enabled
         hooks["shelf_clear"] = shelf_ctl.clear
         assistant.shelf = shelf_ctl
+        assistant.apps = pins
         if settings["onboarded"] and speaker and not args.say:
             QTimer.singleShot(3000, assistant.greet_if_due)      # once per day
         if not args.no_voice and first_download:

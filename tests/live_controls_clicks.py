@@ -36,6 +36,12 @@ class _Clip(QObject):
     dataChanged = Signal()
     def mimeData(self): return None
 shelf = ShelfController(ctl, clipboard=_Clip()); eng.rootContext().setContextProperty("shelf", shelf)
+from app.core.apps import PinnedApps
+from app.ui.apps_ctl import AppsController
+from app.store.db import Settings as _Set
+import tempfile as _tf
+_pins = PinnedApps(_Set(__import__("pathlib").Path(_tf.mkdtemp()) / "a.json"), {}, launcher=lambda t: None)
+eng.rootContext().setContextProperty("apps", AppsController(ctl, _pins))
 eng.load(QUrl.fromLocalFile("app/ui/qml/Notch.qml"))
 w = eng.rootObjects()[0]; qw = wrapInstance(getCppPointer(w)[0], QQuickWindow)
 results = []
