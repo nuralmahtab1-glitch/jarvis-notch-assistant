@@ -194,6 +194,7 @@ Window {
                 visible: win.mode === "claudeWorking"
                 anchors.right: parent.right; anchors.rightMargin: th.flare + 52
                 anchors.verticalCenter: parent.verticalCenter
+                width: 48; horizontalAlignment: Text.AlignRight; elide: Text.ElideRight
                 text: notch.subtitle; color: th.text2
                 font.family: th.font; font.pixelSize: 12
             }
@@ -369,12 +370,12 @@ Window {
                     Repeater {
                         model: notch.todo
                         delegate: Item { required property int index; required property var modelData
-                            width: 300; height: 20
+                            width: 330; height: 20
                             Rectangle { id: box; width: 17; height: 17; radius: 8.5; y: 1.5
                                 color: modelData.done ? th.good : "transparent"
                                 border.color: modelData.done ? th.good : th.text3; border.width: 1.5
                                 Text { anchors.centerIn: parent; visible: modelData.done; text: "✓"; color: "#000"; font.pixelSize: 11; font.weight: Font.Bold } }
-                            Text { x: 27; anchors.verticalCenter: parent.verticalCenter
+                            Text { x: 27; width: parent.width - 27; elide: Text.ElideRight; anchors.verticalCenter: parent.verticalCenter
                                 text: modelData.text; color: modelData.done ? th.text3 : th.text1
                                 font.family: th.font; font.pixelSize: 14; font.strikeout: modelData.done }
                             MouseArea { anchors.fill: parent; onClicked: notch.toggleTodo(index) }
@@ -623,8 +624,8 @@ Window {
                     gradient: Gradient { GradientStop { position: 0; color: "#FFB347" } GradientStop { position: 1; color: "#E5484D" } } }
                 Column {
                     x: th.flare + 20 + 78; y: 26; spacing: 2
-                    Text { text: notch.music.title; color: th.text1; font.family: th.font; font.pixelSize: 15; font.weight: Font.DemiBold }
-                    Text { text: notch.music.artist; color: "#D9A79F"; font.family: th.font; font.pixelSize: 12 }
+                    Text { width: 200; elide: Text.ElideRight; text: notch.music.title; color: th.text1; font.family: th.font; font.pixelSize: 15; font.weight: Font.DemiBold }
+                    Text { width: 200; elide: Text.ElideRight; text: notch.music.artist; color: "#D9A79F"; font.family: th.font; font.pixelSize: 12 }
                 }
                 Item { x: th.flare + 20; y: 104; width: 270; height: 12
                     Rectangle { y: 4; width: parent.width; height: 4; radius: 2; color: "#4A2A25"
@@ -638,9 +639,9 @@ Window {
                 }
                 Column {
                     x: 330; y: 34; spacing: 8; width: 190
-                    Text { text: notch.music.lyrics[0] || ""; color: "#8A5A53"; font.family: th.font; font.pixelSize: 13 }
-                    Text { text: notch.music.lyrics[1] || ""; color: "#FFFFFF"; font.family: th.font; font.pixelSize: 15; font.weight: Font.DemiBold }
-                    Text { text: notch.music.lyrics[2] || ""; color: "#8A5A53"; font.family: th.font; font.pixelSize: 13 }
+                    Text { width: parent.width; elide: Text.ElideRight; maximumLineCount: 1; text: notch.music.lyrics[0] || ""; color: "#8A5A53"; font.family: th.font; font.pixelSize: 13 }
+                    Text { width: parent.width; wrapMode: Text.WordWrap; elide: Text.ElideRight; maximumLineCount: 2; text: notch.music.lyrics[1] || ""; color: "#FFFFFF"; font.family: th.font; font.pixelSize: 15; font.weight: Font.DemiBold }
+                    Text { width: parent.width; elide: Text.ElideRight; maximumLineCount: 1; text: notch.music.lyrics[2] || ""; color: "#8A5A53"; font.family: th.font; font.pixelSize: 13 }
                 }
             }
         }
