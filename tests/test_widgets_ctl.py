@@ -92,8 +92,12 @@ def test_voice_weather_answers_from_cache_or_asks_for_a_city(env, qapp):
 def test_weather_failure_is_spoken_not_raised(qapp, tmp_path):
     cfg = Settings(tmp_path / "s.json"); cfg.set("weather_place", "X"); cfg.set("weather_lat", 1.0); cfg.set("weather_lon", 2.0)
     wc = WidgetsController(cfg, Store(tmp_path / "t.db"), fetch=lambda *a: None)
-    said = []; wc.weather_async(said.append); pump(qapp, 0.5)
-    assert "could not reach" in said[0]
+    said = []; wc.weather_async(said.append)
+    import time
+    end = time.time() + 5                       # wait for the result instead of a fixed pause (a busy PC is slower)
+    while not said and time.time() < end:
+        pump(qapp, 0.05)
+    assert said and "could not reach" in said[0]
 
 
 # ---------------- settings validation ----------------
