@@ -711,8 +711,13 @@ class Assistant(QObject):
                 print("[controls]", e)
                 return
             snap["brightness"] = snap["brightness"] if snap["brightness"] is not None else -1
-            snap["awake"], snap["dnd"] = self.awake.active, bool(self.cfg["dnd"])
-            self.ui(lambda: self.ctl.setControls({k: v for k, v in snap.items() if v is not None or k in ("wifi", "bluetooth")}))
+            def apply():
+                # awake / do-not-disturb are read HERE, at apply time on the UI thread: a value read earlier in the
+                # background thread could be stale and would overwrite a tap you made in the meantime
+                state = {k: v for k, v in snap.items() if v is not None or k in ("wifi", "bluetooth")}
+                state["awake"], state["dnd"] = self.awake.active, bool(self.cfg["dnd"])
+                self.ctl.setControls(state)
+            self.ui(apply)
         threading.Thread(target=work, daemon=True).start()
 
     def _panel_msg(self, text: str, seconds: float = 3.0):

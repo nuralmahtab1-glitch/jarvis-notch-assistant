@@ -191,3 +191,24 @@ def test_negations_mean_keep_awake_not_allow_sleep(text):
 
 def test_let_it_sleep_still_means_allow_sleep():
     assert parse("let it sleep").args["on"] is False and parse("let my laptop sleep").args["on"] is False
+
+
+def test_a_slow_refresh_cannot_overwrite_a_tap_made_in_the_meantime(env, qapp):
+    """Regression: the background refresh used to read 'awake' early and apply it late, undoing your tap."""
+    import threading
+    a, ctl, cfg, tr, spk, t, changes = env
+    gate = threading.Event()
+    class SlowQS:
+        def snapshot(self, *args):
+            gate.wait(3)                                         # the snapshot is slow (e.g. brightness)
+            return {"wifi": True, "bluetooth": True, "airplane": False, "volume": 10, "muted": False,
+                    "brightness": 50, "battery": 80, "plugged": True, "power": "balanced"}
+    a.qs = SlowQS()
+    a.set_keep_awake(True)                                       # awake ON when the refresh starts
+    a.refresh_controls()
+    a.set_keep_awake(False)                                      # you tap it OFF while the refresh is still running
+    gate.set()
+    end = time.time() + 2
+    while time.time() < end:
+        qapp.processEvents(); time.sleep(0.01)
+    assert ctl.controls["awake"] is False and not a.awake.active
