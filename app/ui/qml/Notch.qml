@@ -30,14 +30,14 @@ Window {
         readonly property color rec: "#FF3B30"
         readonly property color moon: "#FFD84D"
         readonly property string font: "Inter, Segoe UI Variable Text, Segoe UI"
-        readonly property string icons: "Segoe Fluent Icons, Segoe MDL2 Assets"
+        readonly property string icons: "Segoe Fluent Icons"
         readonly property int flare: 12
         readonly property int radius: 26
     }
 
     readonly property string mode: notch.mode
     readonly property bool isTiny: mode === "idle" || mode === "sleeping" || mode === "peek"
-    readonly property bool isPanel: mode === "expanded" || mode === "music" || mode === "focus" || mode === "todo"
+    readonly property bool isPanel: mode === "expanded" || mode === "music" || mode === "focus" || mode === "todo" || mode === "controls"
     readonly property bool isCard: mode === "confirm" || mode === "claudeNeeds" || mode === "reminder" || mode === "claudeDone" || mode === "answer"
     readonly property bool isCompact: !isTiny && !isPanel && !isCard
     readonly property bool sleeping: mode === "sleeping"
@@ -300,7 +300,7 @@ Window {
                 TabIcon { glyph: ""; key: "timer"; onClicked: notch.setMode("focus") }
                 TabIcon { glyph: ""; key: "widgets"; onClicked: notch.setMode("todo") }
                 TabIcon { glyph: ""; key: "shelf" }
-                TabIcon { glyph: ""; key: "controls"; onClicked: notch.setMode("volume") }
+                TabIcon { glyph: ""; key: "controls"; onClicked: notch.act("open_controls") }
                 TabIcon { glyph: ""; key: "apps" }
                 TabIcon { glyph: ""; key: "menu"; onClicked: notch.setMode("music") }
             }
@@ -407,6 +407,82 @@ Window {
                 }
             }
 
+            // ---- CONTROLS (quick settings) ----
+            Item {
+                visible: win.mode === "controls"; anchors.fill: parent
+                // six tiles: real toggles for radios, shortcuts into Windows Settings for the rest
+                Grid {
+                    x: th.flare + 20; y: 22; columns: 3; spacing: 8
+                    Repeater {
+                        model: [
+                            { k: "wifi", t: "Wi-Fi", g: "", a: "ctl_wifi", page: false },
+                            { k: "bluetooth", t: "Bluetooth", g: "", a: "ctl_bluetooth", page: false },
+                            { k: "airplane", t: "Airplane", g: "", a: "ctl_airplane", page: false },
+                            { k: "batterysaver", t: "Battery saver", g: "", a: "ctl_page_batterysaver", page: true },
+                            { k: "nightlight", t: "Night light", g: "", a: "ctl_page_nightlight", page: true },
+                            { k: "accessibility", t: "Accessibility", g: "", a: "ctl_page_accessibility", page: true }
+                        ]
+                        delegate: Rectangle {
+                            required property var modelData
+                            readonly property var st: modelData.page ? undefined : notch.controls[modelData.k]
+                            readonly property bool missing: !modelData.page && (st === null || st === undefined)
+                            readonly property bool on: !modelData.page && st === true
+                            width: 88; height: 66; radius: 16
+                            color: on ? th.accent : (tm.containsMouse && !missing ? "#24242A" : "#1A1A1F")
+                            opacity: missing ? 0.35 : 1
+                            Behavior on color { ColorAnimation { duration: 120 } }
+                            scale: tm.pressed ? 0.96 : 1
+                            Behavior on scale { NumberAnimation { duration: 80 } }
+                            Text { x: 12; y: 10; text: modelData.g; font.family: th.icons; font.pixelSize: 19; color: on ? "#001018" : th.text1 }
+                            Text { x: 12; y: 40; width: parent.width - 20; elide: Text.ElideRight; text: modelData.t
+                                font.family: th.font; font.pixelSize: 11; font.weight: Font.Medium; color: on ? "#001018" : th.text2 }
+                            Text { visible: modelData.page; anchors.right: parent.right; anchors.rightMargin: 10; y: 10
+                                text: "›"; color: th.text3; font.pixelSize: 16 }
+                            MouseArea { id: tm; anchors.fill: parent; hoverEnabled: true; enabled: !missing; onClicked: notch.act(modelData.a) }
+                        }
+                    }
+                }
+                // sliders
+                Column {
+                    x: 336; y: 24; spacing: 12
+                    Row { spacing: 10
+                        Text { text: ""; font.family: th.icons; font.pixelSize: 15; color: th.text2; width: 20; anchors.verticalCenter: parent.verticalCenter }
+                        NSlider { name: "brightness"; value: notch.controls.brightness; enabled: notch.controls.brightness >= 0; commitOnRelease: true }
+                        Text { text: notch.controls.brightness >= 0 ? notch.controls.brightness : "--"; width: 28; color: th.text2
+                            font.family: th.font; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter } }
+                    Row { spacing: 10
+                        Text { text: notch.controls.muted ? "" : ""; font.family: th.icons; font.pixelSize: 15; width: 20
+                            color: notch.controls.muted ? th.bad : th.text2; anchors.verticalCenter: parent.verticalCenter
+                            MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: notch.act("ctl_mute") } }
+                        NSlider { name: "volume"; value: notch.controls.volume; commitOnRelease: false }
+                        Text { text: notch.controls.volume; width: 28; color: th.text2; font.family: th.font; font.pixelSize: 12
+                            anchors.verticalCenter: parent.verticalCenter } }
+                }
+                // battery + power mode
+                Column {
+                    x: 336; y: 98; spacing: 8
+                    Row { spacing: 8
+                        Text { text: notch.controls.battery !== undefined && notch.controls.battery !== null ? notch.controls.battery + "%" : "No battery"
+                            color: th.text1; font.family: th.font; font.pixelSize: 20; font.weight: Font.DemiBold; font.features: { "tnum": 1 } }
+                        Text { text: notch.controls.plugged ? "⚡ Plugged in" : "On battery"; color: notch.controls.plugged ? th.good : th.text2
+                            font.family: th.font; font.pixelSize: 12; anchors.baseline: parent.children[0].baseline } }
+                    Row { spacing: 4
+                        Repeater { model: [{ k: "efficiency", t: "Efficient" }, { k: "balanced", t: "Balanced" }, { k: "performance", t: "Performance" }]
+                            delegate: Rectangle { required property int index; required property var modelData
+                                width: pl.implicitWidth + 18; height: 26; radius: 13
+                                color: notch.controls.power === modelData.k ? "#FFFFFF" : "#1A1A1F"
+                                Text { id: pl; anchors.centerIn: parent; text: modelData.t; font.family: th.font; font.pixelSize: 11; font.weight: Font.Medium
+                                    color: notch.controls.power === modelData.k ? "#000000" : th.text2 }
+                                MouseArea { anchors.fill: parent; onClicked: notch.setControl("power", index) } } } }
+                }
+                // screenshot + status line
+                Pill { x: th.flare + 20; y: 190; label: "  Screenshot"; fg: th.text1; bg: "#24242A"; onClicked: notch.act("ctl_screenshot") }
+                Text { x: th.flare + 20 + 134; y: 197; width: 340; elide: Text.ElideRight; text: notch.controls.msg; color: th.accent
+                    font.family: th.font; font.pixelSize: 12 }
+                Text { x: th.flare + 20; y: 236; text: "Wi-Fi and Bluetooth are real switches. Battery saver, night light and accessibility open their Windows pages."
+                    color: th.text3; font.family: th.font; font.pixelSize: 10 }
+            }
+
             // ---- MUSIC ----
             Item {
                 visible: win.mode === "music"; anchors.fill: parent
@@ -435,6 +511,27 @@ Window {
                 }
             }
         }
+    }
+
+    // Slider for the Controls panel. Volume applies live while you drag; brightness applies when you let go
+    // (changing it takes about half a second, so we do not spam it).
+    component NSlider: Item {
+        id: ns
+        property string name: ""
+        property real value: 0
+        property bool commitOnRelease: false
+        width: 128; height: 22
+        opacity: ns.enabled ? 1 : 0.35
+        property real drag: 0
+        readonly property real shown: area.pressed ? drag : value
+        Rectangle { y: 9; width: parent.width; height: 5; radius: 2.5; color: "#2B2B31"
+            Rectangle { width: parent.width * Math.max(0, Math.min(1, ns.shown / 100)); height: 5; radius: 2.5; color: th.text1 } }
+        Rectangle { x: (parent.width - 14) * Math.max(0, Math.min(1, ns.shown / 100)); y: 4; width: 14; height: 14; radius: 7; color: "#FFFFFF" }
+        MouseArea { id: area; anchors.fill: parent; anchors.margins: -4; enabled: ns.enabled
+            function at(mx) { return Math.round(Math.max(0, Math.min(100, (mx - 4) / ns.width * 100))) }
+            onPressed: (m) => { ns.drag = at(m.x); if (!ns.commitOnRelease) notch.setControl(ns.name, ns.drag) }
+            onPositionChanged: (m) => { if (pressed) { ns.drag = at(m.x); if (!ns.commitOnRelease) notch.setControl(ns.name, ns.drag) } }
+            onReleased: { if (ns.commitOnRelease) notch.setControl(ns.name, ns.drag) } }
     }
 
     // ---------------- reusable bits ----------------

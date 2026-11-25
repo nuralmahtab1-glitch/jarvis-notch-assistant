@@ -179,10 +179,21 @@ def parse(text: str, now: datetime | None = None) -> Intent | None:
     # system
     if re.search(r"(take|grab|capture) (a )?screenshot|screenshot", t):
         return Intent("screenshot")
-    if re.search(r"(turn|switch) (the )?wi-?fi (on|off)|toggle wi-?fi", t):
-        return Intent("wifi_toggle")
-    if re.search(r"(toggle|turn (on|off)|switch) (the )?night light", t):
+    on = True if re.search(r"\b(on|enable)\b", t) else False if re.search(r"\b(off|disable)\b", t) else None
+    if re.search(r"wi-?fi|wireless", t) and re.search(r"turn|switch|toggle|enable|disable|\bon\b|\boff\b", t):
+        return Intent("wifi_toggle", {"on": on})
+    if re.search(r"blue ?tooth", t) and re.search(r"turn|switch|toggle|enable|disable|\bon\b|\boff\b", t):
+        return Intent("bluetooth_toggle", {"on": on})
+    if re.search(r"air ?plane mode|flight mode", t):
+        return Intent("airplane_toggle", {"on": on})
+    m = re.search(r"(?:power mode|performance mode|battery saver|power saver)", t)
+    if m:
+        mode = "performance" if "performance" in t else "efficiency" if re.search(r"saver|efficien|battery", t) else "balanced" if "balanced" in t else None
+        return Intent("power_mode_set", {"mode": mode}) if mode else Intent("controls_open")
+    if re.search(r"night light", t):
         return Intent("night_light_toggle")
+    if re.search(r"(open|show|bring up) (the )?(controls|quick settings|control panel)", t):
+        return Intent("controls_open")
     if re.search(r"battery( level| status| percentage)?|how much battery", t):
         return Intent("battery")
     m = re.match(r"(?:open|launch|start|run) (.+)", t)

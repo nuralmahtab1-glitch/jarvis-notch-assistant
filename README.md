@@ -58,6 +58,21 @@ file up first, keeps your own hooks, and tags its entries so **Disconnect** remo
 - Hooks call a tiny stdlib-only helper (`app/claude_bridge/hook.py`) that talks to a loopback-only, token-protected
   local server. If Jarvis is not running the helper exits silently and instantly.
 
+## Controls panel (quick settings in the notch)
+
+Hover the notch, then click the sliders icon (or say "open the controls"). It shows the real state of your PC and
+refreshes every few seconds while open:
+
+- **Real switches:** Wi-Fi and Bluetooth (through Windows' radio API), **Airplane mode** (all radios), and
+  **power mode** (Efficient / Balanced / Performance).
+- **Sliders:** volume (live as you drag) and brightness (applied when you let go). Click the speaker icon to mute.
+- **Battery** percentage and whether you are plugged in, plus a **Screenshot** button.
+- **Shortcuts, honestly labelled:** Battery saver, Night light and Accessibility open their Windows Settings page
+  (marked with a small arrow), because Windows has no supported on/off switch for apps.
+- Also by voice: "turn bluetooth off", "airplane mode on", "set power mode to performance". Turning Wi-Fi off (or
+  Airplane on) by voice **asks first**, because it disconnects you. Tapping a tile is a deliberate action, so it
+  does not ask. If Windows refuses a change, the tile snaps back and says so.
+
 ## Settings
 
 Tray icon -> **Settings...** (or `run.py --settings`; tests: `tests/live_settings_clicks.py` clicks it with a simulated mouse). Seven pages: General (name, start with Windows, sleep time,
@@ -98,8 +113,9 @@ now-playing + synced lyrics, tray menu, 17-step onboarding.
 **Not built yet:**
 - A full **Models page** for cloud providers / API keys (the local brain below is built).
 - Adding your own models by file or Ollama name (the Settings window lists the built-in Qwen3 models only).
-- **Controls / Shelf / Apps** panels, world clocks, weather, teleprompter. Their tab icons show tooltips only.
-- Wi-Fi / Bluetooth / night-light toggles (the assistant says it can't yet).
+- **Shelf / Apps** panels, world clocks, weather, teleprompter. Their tab icons show tooltips only.
+- A real on/off switch for **night light, battery saver and accessibility**: Windows gives apps no supported way to
+  do that, so those tiles open the matching Windows Settings page instead.
 - **Browser extension** for claude.ai/code, and a Windows **installer**.
 - Not yet tested by a human with a real microphone and speakers: wake-word accuracy in a noisy room, dictation
   into every app, voice quality and loudness. Automated tests cover the logic, not your ears.
@@ -107,7 +123,7 @@ now-playing + synced lyrics, tray menu, 17-step onboarding.
 ## Tests
 
 ```powershell
-.venv\Scripts\python.exe -m pytest tests -q     # 107 tests
+.venv\Scripts\python.exe -m pytest tests -q     # 148 tests
 ```
 
 Live checks (need a real screen/speakers): `tests/live_winio_check.py`, `tests/live_voice_roundtrip.py`,

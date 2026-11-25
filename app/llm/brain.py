@@ -24,6 +24,9 @@ TOOLS: dict[str, dict[str, str]] = {
     "screenshot": {}, "open_app": {"name": "app name"}, "open_website": {"url": "domain or url"},
     "search_web": {"query": "search text"}, "battery": {}, "time": {}, "date": {},
     "go_to_sleep": {}, "claude_status": {}, "claude_approve": {}, "claude_deny": {},
+    "wifi_toggle": {"on": "true, false, or omit to toggle"}, "bluetooth_toggle": {"on": "true, false, or omit to toggle"},
+    "airplane_toggle": {"on": "true, false, or omit to toggle"}, "night_light_toggle": {},
+    "power_mode_set": {"mode": "efficiency, balanced or performance"}, "controls_open": {},
     "write_text": {"instruction": "what to write, e.g. 'a polite email asking for a deadline extension'"},
 }
 INT_ARGS = {"minutes": 25, "level": 50, "delta": 10}
@@ -39,6 +42,7 @@ class Decision:
     intent: Intent | None = None
     answer: str | None = None
     error: str | None = None
+    retry_as_answer: bool = False      # the model used a tool the words did not justify: ask again for plain text
 
 
 def time_note(now: datetime | None = None) -> str:
@@ -62,6 +66,7 @@ def system_prompt(name: str, now: datetime | None = None) -> str:
         "- 'remember / don't let me forget X' with no time -> todo_add. With a time -> set_reminder.\n"
         "- 'put on / play X' -> play_music. 'is Claude done / what is Claude doing' -> claude_status.\n"
         "- If asked to delete, erase, wipe or destroy files or data, answer that you cannot do that.\n"
+        "- General-knowledge questions get a direct answer. Use search_web ONLY when the user says search, look up or google.\n"
         f"Tools:\n{tools}\n"
         "Examples:\n"
         'User: how much battery is left -> {"tool":"battery","args":{}}\n'
@@ -101,6 +106,14 @@ def to_intent(obj: dict, now: datetime | None = None) -> Decision:
                     args[k] = int(float(str(args[k]).replace("+", "")))
                 except ValueError:
                     args[k] = INT_ARGS[k]
+        if tool in ("wifi_toggle", "bluetooth_toggle", "airplane_toggle"):
+            v = raw.get("on")
+            args = {"on": v if isinstance(v, bool) else (str(v).lower() in ("true", "on", "yes") if v is not None else None)}
+        if tool == "power_mode_set":
+            mode = str(raw.get("mode", "")).lower().strip()
+            if mode not in ("efficiency", "balanced", "performance"):
+                return Decision(error="unknown power mode")
+            args = {"mode": mode}
         if tool == "focus_start":
             args["minutes"] = max(1, min(180, args.get("minutes", 25)))
         if tool in ("volume_set", "brightness_set"):
@@ -163,10 +176,29 @@ class Brain:
             return Decision(answer=plain[:300]) if plain else Decision(error="empty reply")
         d = to_intent(obj, now)
         d = self._guard(text, d)
+        if d.retry_as_answer:
+            d = self._answer_directly(text, now)
         if d.answer or d.intent:
             self.history.append((text, d.answer or json.dumps(obj)))
             del self.history[:-6]
         return d
+
+    SEARCH_WORDS = re.compile(r"search|look up|lookup|google|bing|browse|web|find (me )?(information|info|out)|on the internet", re.I)
+
+    def _answer_directly(self, text: str, now: datetime | None) -> Decision:
+        """Second chance: a plain-text answer, no tools, for questions the model wrongly turned into a web search."""
+        try:
+            with self._lock:
+                out = self.backend.chat(
+                    [{"role": "system", "content": f"You are {config.APP_NAME}, a calm, concise British butler-style assistant. "
+                      "Answer the question directly in one or two short sentences. Plain text only. "
+                      "If you do not know, say so briefly."},
+                     {"role": "user", "content": f"{time_note(now)} {text}"}],
+                    max_tokens=120, temperature=0.2, json_mode=False)
+        except Exception as e:
+            return Decision(error=f"brain failed: {e}")
+        plain = re.sub(r"<think>.*?</think>", "", out, flags=re.S).strip()
+        return Decision(answer=plain[:300]) if plain else Decision(error="empty reply")
 
     DESTRUCTIVE = re.compile(
         r"\b(delete|erase|wipe|format|destroy|uninstall|shred|nuke|purge|trash|get rid of|throw (it |them )?(all )?away|"
@@ -188,6 +220,10 @@ class Brain:
         "brightness_change": re.compile(r"bright|dim|dark|glare|screen|display|monitor|light", re.I),
         "volume_set": re.compile(r"volume|loud|quiet|sound|audio|speaker|hear|decibel|turn it", re.I),
         "volume_change": re.compile(r"volume|loud|quiet|sound|audio|speaker|hear|turn it|up|down", re.I),
+        "wifi_toggle": re.compile(r"wi-?fi|wireless|internet|network|online", re.I),
+        "bluetooth_toggle": re.compile(r"blue ?tooth", re.I),
+        "airplane_toggle": re.compile(r"air ?plane|flight|offline", re.I),
+        "power_mode_set": re.compile(r"power|performance|battery|efficien|balanced|mode|saver", re.I),
         "go_to_sleep": re.compile(r"sleep|night|done for the day|switch off|shut|bed|rest|bye", re.I),
         "screenshot": re.compile(r"screen|shot|picture|capture|snap|photo|display|image", re.I),
     }
@@ -203,6 +239,8 @@ class Brain:
             if self.DESTRUCTIVE.search(text):
                 return Decision(answer="I cannot delete things from your PC, and I will not guess.")
             return Decision(error="list change was not asked for")
+        if d.intent and d.intent.name == "search_web" and not self.SEARCH_WORDS.search(text):
+            return Decision(error="search was not asked for", retry_as_answer=True)
         if d.intent and d.intent.name in self.SANITY and not self.SANITY[d.intent.name].search(text):
             return Decision(error=f"{d.intent.name} does not match the request")
         """Destructive wording never becomes an action unless it is an explicit, specific list removal."""

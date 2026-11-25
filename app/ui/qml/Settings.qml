@@ -43,7 +43,7 @@ Window {
                     width: parent.width; height: 38; radius: 10
                     color: win.page === index ? "#FFFFFF" : (ma.containsMouse ? "#F1F1F6" : "transparent")
                     Text { x: 14; anchors.verticalCenter: parent.verticalCenter; text: win.icons[index]
-                        font.family: "Segoe Fluent Icons, Segoe MDL2 Assets"; font.pixelSize: 15
+                        font.family: "Segoe Fluent Icons"; font.pixelSize: 15
                         color: win.page === index ? win.accent : win.sub }
                     Text { x: 44; anchors.verticalCenter: parent.verticalCenter; text: modelData
                         font.family: win.fontFam; font.pixelSize: 14; font.weight: win.page === index ? Font.DemiBold : Font.Normal

@@ -26,13 +26,13 @@ DEFAULT_TEXT = {
 }
 MODES = ["idle", "sleeping", "expanded", "listening", "hearing", "working", "done", "recording",
          "speaking", "confirm", "volume", "reminder", "music", "focus", "todo",
-         "claudeWorking", "claudeNeeds", "claudeDone", "claudeError"]
+         "claudeWorking", "claudeNeeds", "claudeDone", "claudeError", "controls"]
 SIZES = {  # width, height
     "idle": (180, 36), "sleeping": (180, 36), "peek": (210, 42), "expanded": (560, 150),
     "listening": (300, 44), "recording": (300, 44), "hearing": (400, 44), "working": (300, 44),
     "done": (250, 44), "speaking": (340, 44), "confirm": (450, 96), "volume": (300, 44),
     "reminder": (400, 76), "music": (560, 176), "focus": (560, 150), "todo": (560, 176),
-    "claudeWorking": (440, 44), "claudeNeeds": (500, 96), "claudeDone": (500, 76), "claudeError": (400, 44), "answer": (520, 92),
+    "claudeWorking": (440, 44), "claudeNeeds": (500, 96), "claudeDone": (500, 76), "claudeError": (400, 44), "answer": (520, 92), "controls": (560, 268),
 }
 DEMO_TEXT = {
     "hearing": ("Remind me to water the plants at six", ""), "speaking": ("Certainly.", ""),
@@ -48,6 +48,7 @@ class NotchController(QObject):
     changed = Signal()
     action = Signal(str)          # button presses from the UI: approve, deny, confirm, cancel, ...
     todoToggled = Signal(int)     # id of the item the user ticked
+    controlChanged = Signal(str, int)   # a slider/segment in the Controls panel: (name, value)
 
     def __init__(self, demo_text: bool = False):
         super().__init__()
@@ -67,6 +68,8 @@ class NotchController(QObject):
         self._demo_text = demo_text
         self._music = {"title": "Late Night Drive", "artist": "Nova Park", "frac": 0.32,
                        "lyrics": ["City lights on the glass", "Radio turned down low", "Nowhere left to be"]}
+        self._controls = {"wifi": True, "bluetooth": True, "airplane": False, "volume": 55, "muted": False,
+                          "brightness": 70, "battery": 86, "plugged": False, "power": "balanced", "msg": ""}
         self._busy_until = 0.0     # user/assistant interaction in progress: do not auto-sleep
         self._demo = QTimer(self); self._demo.timeout.connect(self._next_demo); self._demo_i = 0
         self._poll = QTimer(self); self._poll.setInterval(33); self._poll.timeout.connect(self._tick); self._poll.start()
@@ -99,6 +102,7 @@ class NotchController(QObject):
     focusFrac = Property(float, lambda s: max(0.0, s._focus_left) / max(1, s._focus_total), notify=changed)
     level = Property(float, lambda s: s._level, notify=changed)
     music = Property("QVariantMap", lambda s: s._music, notify=changed)
+    controls = Property("QVariantMap", lambda s: s._controls, notify=changed)
     appName = Property(str, lambda s: config.APP_NAME, constant=True)
     credit = Property(str, lambda s: config.CREDIT, constant=True)
     boxW = Property(int, lambda s: SIZES.get(s._mode, (180, 36))[0], notify=changed)
@@ -135,6 +139,17 @@ class NotchController(QObject):
         self._focus_left, self._focus_total = left, total
         self.changed.emit()
 
+    def setControls(self, c: dict):
+        self._controls = {**self._controls, **c}
+        self.changed.emit()
+
+    @Slot(str, int)
+    def setControl(self, name: str, value: int):
+        """Called by the panel's sliders. Echo locally for instant feedback, then let the assistant apply it."""
+        self._controls = {**self._controls, name: value}
+        self.controlChanged.emit(name, int(value))
+        self.changed.emit()
+
     def setMusic(self, m: dict):
         self._music = m
         self.changed.emit()
@@ -161,11 +176,11 @@ class NotchController(QObject):
             self._last_active = time.monotonic()
             if self._mode in ("idle", "sleeping", "peek"):
                 self.setMode("expanded")
-        elif self._mode == "expanded":
+        elif self._mode in ("expanded", "controls"):
             self._collapse.start()
 
     def _do_collapse(self):
-        if self._mode == "expanded":
+        if self._mode in ("expanded", "controls"):
             self.setMode("idle")
 
     @Slot(str)

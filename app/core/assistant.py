@@ -14,6 +14,7 @@ from app.tools import dictation
 from app.tools.intents import CAPABILITIES, Intent, parse
 from app.ui.controller import NotchController
 from app.winio import system as win
+from app.winio import controls as qs
 from app.claude_bridge.tracker import TERMINAL_PROCS, Tracker, fmt_duration
 
 
@@ -42,9 +43,13 @@ class Assistant(QObject):
         self._focus_total = 0
         self._focus_label = "Focus"
         self._claude_seen: dict[str, str] = {}
+        self.qs = qs                       # quick-settings backend (swappable in tests)
+        self._ctl_tick = 0
+        self._brightness_lock = threading.Lock()
         self._level_t = 0.0
         self._ui.connect(lambda fn: fn())
         ctl.action.connect(self.on_action)
+        ctl.controlChanged.connect(self.on_control)
         ctl.todoToggled.connect(lambda tid: (self.store.todo_toggle(tid), self.refresh_todo()))
         if speaker:
             speaker._on_state = lambda on: self.ui(lambda: self._speaking_changed(on))
@@ -68,7 +73,7 @@ class Assistant(QObject):
         m = self.speak_mode
         return m == "always" or (m == "voice" and src in ("key", "wake"))
 
-    CARD_MODES = ("todo", "volume", "focus", "music")
+    CARD_MODES = ("todo", "volume", "focus", "music", "controls")
 
     def say(self, text: str, src: str = "key", mode: str = "done", hold: float = 2.6):
         """Show the reply in the notch and speak it if the interaction was by voice.
@@ -307,8 +312,16 @@ class Assistant(QObject):
             if it.name == "battery":
                 pct, plugged = win.battery()
                 return "No battery detected." if pct is None else f"Battery is at {pct} percent{', charging' if plugged else ''}."
-            if it.name in ("wifi_toggle", "night_light_toggle"):
-                return "I cannot toggle that one yet, " + n + "."
+            if it.name in ("wifi_toggle", "bluetooth_toggle", "airplane_toggle"):
+                return self.voice_quick(it.name[:-7], a.get("on"), src)
+            if it.name == "power_mode_set":
+                ok = self.qs.set_power_mode(a["mode"]); self.refresh_controls()
+                return f"Power mode set to {a['mode']}." if ok else "Windows would not change the power mode."
+            if it.name == "night_light_toggle":
+                self.qs.open_settings_page("nightlight")
+                return "Windows does not let apps switch night light, so I opened its settings."
+            if it.name == "controls_open":
+                self.open_controls(); return ""
             if it.name == "claude_status":
                 return self.tracker.status_sentence() if self.tracker else "Claude is not connected."
             if it.name == "claude_done_query":
@@ -369,6 +382,11 @@ class Assistant(QObject):
             if self.speaker and self.speak_mode != "off":
                 self.speaker.speak(f"Reminder: {r['text']}.")
             self._last_reminder = r
+        if self.ctl.mode == "controls":
+            self.ctl.keepAwake(5)
+            self._ctl_tick += 1
+            if self._ctl_tick % 3 == 0:
+                self.refresh_controls()
         if self.tracker and self.ctl.mode == "claudeWorking":
             self.sync_claude()
 
@@ -391,6 +409,11 @@ class Assistant(QObject):
             r = getattr(self, "_last_reminder", None)
             if r: self.store.reminder_add(r["text"], time.time() + 600)
             self.ctl.setMode("idle")
+        elif name == "open_controls": self.open_controls()
+        elif name in ("ctl_wifi", "ctl_bluetooth", "ctl_airplane"): self.toggle_quick(name[4:])
+        elif name.startswith("ctl_page_"): self.qs.open_settings_page(name[9:])
+        elif name == "ctl_mute": self.on_control("mute", 0)
+        elif name == "ctl_screenshot": self.take_screenshot_from_panel()
         elif name == "focus_stop": self.stop_focus()
         elif name == "focus_break": self.start_focus(5, label="Break")
         elif name == "media_play": win.media_play_pause()
@@ -616,3 +639,86 @@ class Assistant(QObject):
         self.ctl.setMode("done")
         self.ctl.setText("Done", "")
         QTimer.singleShot(1500, self._back_to_idle)
+
+    # ------------------------------------------------------------------ Controls panel (quick settings)
+    def open_controls(self):
+        self.ctl.wake()
+        self.ctl.keepAwake(30)
+        self.ctl.setMode("controls")
+        self.refresh_controls()
+
+    def refresh_controls(self):
+        """Read the real state off the UI thread (brightness is slow) and show it."""
+        def work():
+            try:
+                snap = self.qs.snapshot(win.get_volume, win.is_muted, win.get_brightness, win.battery)
+            except Exception as e:
+                print("[controls]", e)
+                return
+            snap["brightness"] = snap["brightness"] if snap["brightness"] is not None else -1
+            self.ui(lambda: self.ctl.setControls({k: v for k, v in snap.items() if v is not None or k in ("wifi", "bluetooth")}))
+        threading.Thread(target=work, daemon=True).start()
+
+    def _panel_msg(self, text: str, seconds: float = 3.0):
+        self.ctl.setControls({"msg": text})
+        QTimer.singleShot(int(seconds * 1000), lambda: self.ctl.controls.get("msg") == text and self.ctl.setControls({"msg": ""}))
+
+    def toggle_quick(self, which: str, on: bool | None = None):
+        """Flip Wi-Fi / Bluetooth / Airplane from a tile click (a deliberate tap, so no confirmation)."""
+        cur = self.ctl.controls
+        if which == "airplane":
+            want = (not cur["airplane"]) if on is None else on
+            self.ctl.setControls({"airplane": want, "wifi": False if want else True, "bluetooth": False if want else True})
+        else:
+            want = (not cur[which]) if on is None else on
+            self.ctl.setControls({which: want, "airplane": False if want else cur["airplane"]})
+
+        def work():
+            ok = self.qs.set_airplane(want) if which == "airplane" else self.qs.set_radio(which, want)
+            if not ok:
+                self.ui(lambda: self._panel_msg("Windows would not change that"))
+            self.ui(self.refresh_controls)
+        threading.Thread(target=work, daemon=True).start()
+
+    def voice_quick(self, which: str, on: bool | None, src: str) -> str | None:
+        """Voice version: turning Wi-Fi/Airplane OFF cuts your connection, so it asks first."""
+        label = {"wifi": "Wi-Fi", "bluetooth": "Bluetooth", "airplane": "Airplane mode"}[which]
+        cur = self.ctl.controls
+        state = {"wifi": cur["wifi"], "bluetooth": cur["bluetooth"], "airplane": cur["airplane"]}[which]
+        want = (not state) if on is None else on
+        turning_off_net = (which == "wifi" and not want) or (which == "airplane" and want)
+        if turning_off_net:
+            self.confirm(f"Turn {label} {'off' if which == 'wifi' else 'on'}? That disconnects you.",
+                         lambda: self.toggle_quick(which, want), src)
+            return None
+        self.toggle_quick(which, want)
+        return f"{label} {'on' if (want if which != 'airplane' else not want) else 'off'}." if which != "airplane" else f"Airplane mode {'on' if want else 'off'}."
+
+    def on_control(self, name: str, value: int):
+        """A slider/segment was used in the panel."""
+        if name == "volume":
+            win.set_volume(value)
+        elif name == "mute":
+            muted = win.toggle_mute()
+            self.ctl.setControls({"muted": muted})
+        elif name == "brightness":
+            def work():
+                with self._brightness_lock:
+                    win.set_brightness(value)
+            threading.Thread(target=work, daemon=True).start()
+        elif name == "power":
+            mode = ["efficiency", "balanced", "performance"][max(0, min(2, value))]
+            ok = self.qs.set_power_mode(mode)
+            self.ctl.setControls({"power": mode} if ok else {})
+            if not ok:
+                self._panel_msg("Windows would not change the power mode")
+
+    def take_screenshot_from_panel(self):
+        def work():
+            try:
+                path = win.screenshot()
+                self.ui(lambda: self._panel_msg("Screenshot saved to Pictures"))
+            except Exception as e:
+                print("[screenshot]", e)
+                self.ui(lambda: self._panel_msg("Could not take the screenshot"))
+        threading.Thread(target=work, daemon=True).start()

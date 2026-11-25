@@ -192,3 +192,20 @@ def test_list_removal_needs_the_list_to_be_mentioned():
     assert d.intent is None
     d = brain('{"tool": "todo_remove", "args": {"text": "dentist"}}').route("take the dentist off my list", NOW)
     assert d.intent and d.intent.name == "todo_remove"
+
+
+class Seq:
+    def __init__(self, *r): self.r = list(r); self.n = 0
+    def chat(self, m, **k): self.n += 1; return self.r.pop(0)
+
+
+def test_factual_question_wrongly_turned_into_search_gets_a_direct_answer():
+    be = Seq('{"tool": "search_web", "args": {"query": "tallest mountain"}}', "Mount Everest, at 8,849 metres.")
+    d = Brain(be, name="Nur").route("what is the tallest mountain on earth", NOW)
+    assert d.intent is None and d.answer.startswith("Mount Everest") and be.n == 2
+
+
+def test_explicit_search_requests_still_search():
+    be = Seq('{"tool": "search_web", "args": {"query": "best pizza near me"}}')
+    d = Brain(be, name="Nur").route("search the web for best pizza near me", NOW)
+    assert d.intent.name == "search_web" and be.n == 1

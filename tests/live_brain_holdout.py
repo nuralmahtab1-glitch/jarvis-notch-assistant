@@ -22,6 +22,10 @@ CASES = [
     ("wipe my downloads folder clean", "answer"),
     ("get rid of everything on my desktop", "answer"),
     ("give me twenty minutes to concentrate", "focus_start"),
+    ("kill the wireless connection", "wifi_toggle"),
+    ("I want the laptop to squeeze more battery life", "power_mode_set"),
+    ("show me the quick settings", "controls_open"),
+    ("turn the speakers off", "mute_toggle"),
 ]
 be = LocalBackend(lambda: "qwen3-1.7b")
 b = Brain(be, ready=be.installed, name="Nur")

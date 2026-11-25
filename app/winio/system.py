@@ -233,3 +233,7 @@ def chime() -> None:
         winsound.MessageBeep(winsound.MB_ICONASTERISK)
     except Exception:
         pass
+
+
+def is_muted() -> bool:
+    return bool(_endpoint().GetMute())
