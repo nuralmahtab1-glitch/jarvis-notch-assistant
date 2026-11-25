@@ -23,8 +23,9 @@ def tray_icon() -> QIcon:
     p.setBrush(QColor("#0B0B0E")); p.setPen(Qt.NoPen)
     p.drawRoundedRect(4, 18, 56, 28, 14, 14)
     p.setBrush(QColor("#FFFFFF"))
-    p.drawRoundedRect(20, 25, 7, 14, 3.5, 3.5)
-    p.drawRoundedRect(37, 25, 7, 14, 3.5, 3.5)
+    p.setBrush(QColor('#E4F7FF'))
+    p.drawRoundedRect(17, 29, 12, 7, 3.5, 3.5)
+    p.drawRoundedRect(35, 29, 12, 7, 3.5, 3.5)
     p.end()
     return QIcon(pm)
 
@@ -140,6 +141,10 @@ def main() -> int:
                                 is_blocked=lambda: assistant.busy or bool(speaker and speaker.speaking))
             wake.start()
             app.aboutToQuit.connect(wake.stop)
+        from app.winio.media import MediaWatcher
+        media = MediaWatcher(assistant.on_media, assistant.on_track_change, lyrics=bool(settings["lyrics"]))
+        media.start()
+        app.aboutToQuit.connect(media.stop)
         if args.say:
             QTimer.singleShot(800, lambda: assistant.handle_text(args.say, "key"))
         app.assistant = assistant      # keep alive

@@ -461,3 +461,23 @@ class Assistant(QObject):
                 self.speaker.speak(self.persona.say("claude_error"))
             QTimer.singleShot(8000, lambda: self.ctl.mode == "claudeError" and self.ctl.setMode("idle"))
         self._claude_seen[s.id] = s.state
+
+    # ------------------------------------------------------------------ music
+    def on_media(self, st: dict):
+        """Called from the media thread once a second."""
+        def apply():
+            if st["title"]:
+                frac = (st["pos"] / st["dur"]) if st["dur"] else 0.0
+                self.ctl.setMusic({"title": st["title"], "artist": st["artist"], "frac": max(0.0, min(1.0, frac)),
+                                   "lyrics": st.get("lyrics", ["", "", ""])})
+            else:
+                self.ctl.setMusic({"title": "Nothing playing", "artist": "", "frac": 0.0, "lyrics": ["", "", ""]})
+        self.ui(apply)
+
+    def on_track_change(self, st: dict):
+        """A new song started: peek the music card for a few seconds (unless you are busy)."""
+        def peek():
+            if not self.busy and self.ctl.mode in ("idle", "peek", "sleeping") and not self.cfg["dnd"]:
+                self.ctl.wake()
+                self.show_card("music", seconds=6)
+        self.ui(peek)

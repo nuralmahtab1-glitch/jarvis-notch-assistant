@@ -20,23 +20,23 @@ Window {
     readonly property string fontFam: "Inter, Segoe UI Variable Display, Segoe UI"
 
     readonly property var steps: [
-        { t: "Meet " + ob.appName, s: ob.appName + " lives at the top of your screen.", d: "meet" },
-        { t: "Always close", s: "It stays tiny until you need it.", d: "close" },
-        { t: "Take " + ob.appName + " anywhere", s: "It follows you across desktops and apps.", d: "anywhere" },
-        { t: "One click away", s: "Hover or click to open Command, Dictate and Write.", d: "click" },
-        { t: "Just say \"" + ob.wakePhrase + "\"", s: "Or hold Right Ctrl. Your words appear as you speak.", d: "say" },
-        { t: "Working on it. Done.", s: "Quick tasks stay small, so you can keep going.", d: "work" },
-        { t: "It asks first", s: "Before it does anything risky, it checks with you.", d: "asks" },
-        { t: "Your to-do list", s: "Add things by voice. Tick them off and see what's done.", d: "todo" },
-        { t: "Focus, then a break", s: "Say \"Start a focus session\". The break follows by itself.", d: "focus" },
-        { t: "Music, with lyrics", s: "See the song, sing along, and pause or skip from the notch.", d: "music" },
-        { t: "Windows, in the notch", s: "Volume, brightness, charging and reminders show up here.", d: "windows" },
-        { t: "Dictate anywhere", s: "Hold Right Alt and talk. Text appears in the app you're in.", d: "dictate" },
-        { t: "How should I address you?", s: "I'll use it now and then in a short reply.", d: "name", kind: "name" },
-        { t: "Private by design", s: "Everything runs on this PC. Your audio is deleted as soon as it's transcribed.", d: "name", kind: "privacy" },
-        { t: "Give " + ob.appName + " a brain", s: ob.hardware + " (" + ob.ramText + ")", d: "name", kind: "brain" },
-        { t: "Connect Claude Code", s: "Optional. See what Claude is doing and approve actions from the notch.", d: "claude", kind: "claude" },
-        { t: "You're all set", s: ob.appName + " lives at the top of your screen. Try one of these.", d: "done", kind: "done" }
+        { t: "Hello, I'm " + ob.appName, s: "I sit at the very top of your screen, out of the way.", d: "meet" },
+        { t: "Tiny until needed", s: "Point at the top edge and I slide out.", d: "close" },
+        { t: "Wherever you work", s: "I stay with you across desktops and windows.", d: "anywhere" },
+        { t: "Everything one click away", s: "Hover or click to open Command, Dictate and Write.", d: "click" },
+        { t: "Say \u201C" + ob.wakePhrase + "\u201D", s: "Or hold Right Ctrl. You will see your words appear live.", d: "say" },
+        { t: "Small jobs stay small", s: "I do it, say done, and get out of your way.", d: "work" },
+        { t: "I check before I act", s: "Anything risky waits for your OK.", d: "asks" },
+        { t: "A list that listens", s: "Add tasks by voice and tick them off as you go.", d: "todo" },
+        { t: "Deep work, then rest", s: "Ask for a focus session and I will time the break.", d: "focus" },
+        { t: "Your music, in the notch", s: "See what is playing, follow the lyrics, skip a track.", d: "music" },
+        { t: "Windows, at a glance", s: "Volume, charging and reminders pop up right here.", d: "windows" },
+        { t: "Type with your voice", s: "Hold Right Alt and speak. Clean text lands in any app.", d: "dictate" },
+        { t: "What should I call you?", s: "I will use it now and then in a short reply.", d: "name", kind: "name" },
+        { t: "Yours alone", s: "Everything runs on this PC. Audio is deleted right after it is understood.", d: "name", kind: "privacy" },
+        { t: "Add a brain later", s: ob.hardware + " (" + ob.ramText + ")", d: "name", kind: "brain" },
+        { t: "Watch Claude Code", s: "Optional. See what Claude is doing and approve actions from here.", d: "claude", kind: "claude" },
+        { t: "Ready when you are", s: ob.appName + " is at the top of your screen. Try one of these.", d: "done", kind: "done" }
     ]
     readonly property var cur: steps[step]
     readonly property real stageH: cur.kind !== undefined && cur.kind !== "done" ? 170 : 250
@@ -98,7 +98,7 @@ Window {
             // privacy
             Column {
                 visible: win.cur.kind === "privacy"; anchors.horizontalCenter: parent.horizontalCenter; spacing: 12; width: 420
-                Toggle { label: "Listen for \"" + ob.wakePhrase + "\""; checked: ob.wake; onToggled: ob.setWake(on) }
+                Toggle { label: "Listen for \u201C" + ob.wakePhrase + "\u201D"; checked: ob.wake; onToggled: ob.setWake(on) }
                 Toggle { label: "Start with Windows"; checked: false; onToggled: ob.setAutostart(on) }
                 Row { spacing: 12
                     Text { text: "Microphone"; color: "#17171C"; font.family: win.fontFam; font.pixelSize: 14; width: 150; anchors.verticalCenter: parent.verticalCenter }
@@ -141,10 +141,10 @@ Window {
             Column {
                 visible: win.cur.kind === "done"; anchors.horizontalCenter: parent.horizontalCenter; spacing: 10
                 Grid { columns: 2; spacing: 10; anchors.horizontalCenter: parent.horizontalCenter
-                    Repeater { model: ["\"Start a focus session\"", "\"What's on my list?\"", "\"Play Billie Jean on Spotify\"", "\"Take a screenshot\""]
+                    Repeater { model: ["\u201CStart a 25 minute focus\u201D", "\u201CWhat do I need to do today?\u201D", "\u201CPlay something chill on Spotify\u201D", "\u201CCapture my screen\u201D"]
                         delegate: Rectangle { required property string modelData; width: 250; height: 34; radius: 12; color: "#FFFFFF"; border.color: "#E0E0E8"
                             Text { anchors.centerIn: parent; text: modelData; color: "#17171C"; font.family: win.fontFam; font.pixelSize: 12 } } } }
-                Text { text: "Ask \"What can you do?\" any time."; color: "#6B6B75"; font.family: win.fontFam; font.pixelSize: 12; anchors.horizontalCenter: parent.horizontalCenter }
+                Text { text: "Not sure what to say? Ask \u201CWhat can you do?\u201D"; color: "#6B6B75"; font.family: win.fontFam; font.pixelSize: 12; anchors.horizontalCenter: parent.horizontalCenter }
                 Text { text: ob.credit; color: win.accent; font.family: win.fontFam; font.pixelSize: 13; font.weight: Font.DemiBold; anchors.horizontalCenter: parent.horizontalCenter }
             }
         }
@@ -202,10 +202,10 @@ Window {
 
     component Eyes: Item {
         width: 40; height: 22
-        property color tint: "#fff"
+        property color tint: "#E4F7FF"
         property bool happy: false
         Repeater { model: 2
-            delegate: Rectangle { required property int index; x: 5 + index * 20; y: 4; width: 7; height: happy ? 3 : 14; radius: 3.5; color: tint
+            delegate: Rectangle { required property int index; x: 4 + index * 20; y: 7; width: 12; height: happy ? 2.5 : 7; radius: height / 2; color: tint
                 Behavior on height { NumberAnimation { duration: 80 } } } }
     }
 
@@ -265,7 +265,7 @@ Window {
                     delegate: Text { required property string modelData; text: modelData; color: "#fff"; font.pixelSize: 16 } } } } } }
 
     Component { id: dClick; Item { id: r; property int i: 0; function restart() { tm.restart() }
-        readonly property var names: [["Dictate", "Talk, and your words appear where you type."], ["Write", "Say what you need, and it writes it for you."], ["Widgets", "The time around the world, your list, battery and weather."], ["Controls", "Volume, brightness, Wi-Fi, power mode and a screenshot."]]
+        readonly property var names: [["Dictate", "Speak, and clean text lands wherever your cursor is."], ["Write", "Tell me what you need and I will draft it."], ["Widgets", "Your list, the clock, battery and what is coming up."], ["Controls", "Sound, screen brightness, power and a quick screenshot."]]
         Timer { id: tm; interval: 1400; repeat: true; running: true; onTriggered: r.i = (r.i + 1) % 4 }
         MiniNotch { w: 520; h: 140; panel: true
             Row { x: 26; y: 14; spacing: 8
@@ -276,7 +276,7 @@ Window {
                 Text { text: r.names[r.i][0]; color: "#fff"; font.family: win.fontFam; font.pixelSize: 16; font.weight: Font.DemiBold }
                 Text { text: r.names[r.i][1]; color: "#9A9AA3"; font.family: win.fontFam; font.pixelSize: 11; width: 370; elide: Text.ElideRight } } } } }
 
-    Component { id: dSay; Item { id: r; property string full: "Remind me to call Mom at six"; property int n: 0; function restart() { n = 0; tm.restart() }
+    Component { id: dSay; Item { id: r; property string full: "Remind me to water the plants at six"; property int n: 0; function restart() { n = 0; tm.restart() }
         Timer { id: tm; interval: 70; repeat: true; running: true; onTriggered: { r.n = (r.n + 1) % (r.full.length + 25) } }
         MiniNotch { w: 420; h: 44
             Eyes { x: 20; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: -2 }
@@ -294,8 +294,8 @@ Window {
     Component { id: dAsks; Item { function restart() {}
         MiniNotch { w: 450; h: 96; panel: true
             Eyes { x: 24; y: 20; tint: "#fff" }
-            Text { x: 84; y: 16; text: "Send the slides to Sam?"; color: "#fff"; font.family: win.fontFam; font.pixelSize: 14; font.weight: Font.DemiBold }
-            Text { x: 84; y: 38; text: "I will only do it if you say so."; color: "#9A9AA3"; font.family: win.fontFam; font.pixelSize: 12 }
+            Text { x: 84; y: 16; text: "Email the report to Maya?"; color: "#fff"; font.family: win.fontFam; font.pixelSize: 14; font.weight: Font.DemiBold }
+            Text { x: 84; y: 38; text: "Nothing is sent until you say so."; color: "#9A9AA3"; font.family: win.fontFam; font.pixelSize: 12 }
             Row { anchors.right: parent.right; anchors.rightMargin: 24; y: 56; spacing: 8
                 Rectangle { width: 74; height: 28; radius: 14; color: "#24242A"; Text { anchors.centerIn: parent; text: "Not now"; color: "#fff"; font.pixelSize: 12; font.weight: Font.DemiBold } }
                 Rectangle { width: 74; height: 28; radius: 14; color: "#fff"; Text { anchors.centerIn: parent; text: "Confirm"; color: "#000"; font.pixelSize: 12; font.weight: Font.DemiBold } } } } } }
@@ -307,7 +307,7 @@ Window {
                 Text { text: "To-do"; color: "#9A9AA3"; font.pixelSize: 11 }
                 Text { text: r.done + "/4"; color: "#fff"; font.pixelSize: 36; font.weight: Font.DemiBold } }
             Column { x: 190; y: 22; spacing: 8
-                Repeater { model: ["Buy coffee beans", "Book the dentist", "Reply to Sam", "Call Mom at six"]
+                Repeater { model: ["Water the plants", "Pay the electricity bill", "Email the landlord", "Call Dad at six"]
                     delegate: Row { required property int index; required property string modelData; spacing: 10
                         Rectangle { width: 16; height: 16; radius: 8; color: index < r.done ? "#34D399" : "transparent"; border.color: index < r.done ? "#34D399" : "#5E5E66"; border.width: 1.5 }
                         Text { text: modelData; color: index < r.done ? "#5E5E66" : "#fff"; font.pixelSize: 13; font.strikeout: index < r.done } } } } } } }
@@ -327,12 +327,12 @@ Window {
             Rectangle { anchors.fill: parent; radius: 24; gradient: Gradient { GradientStop { position: 0; color: "#3A1712" } GradientStop { position: 1; color: "#1A0B09" } } }
             Rectangle { x: 30; y: 28; width: 60; height: 60; radius: 12; gradient: Gradient { GradientStop { position: 0; color: "#FFB347" } GradientStop { position: 1; color: "#E5484D" } } }
             Column { x: 106; y: 32; spacing: 2
-                Text { text: "Golden Hour"; color: "#fff"; font.pixelSize: 15; font.weight: Font.DemiBold }
-                Text { text: "The Quiet Hours"; color: "#D9A79F"; font.pixelSize: 12 } }
+                Text { text: "Late Night Drive"; color: "#fff"; font.pixelSize: 15; font.weight: Font.DemiBold }
+                Text { text: "Nova Park"; color: "#D9A79F"; font.pixelSize: 12 } }
             Column { x: 300; y: 36; spacing: 8
-                Text { text: "The light comes in low"; color: "#8A5A53"; font.pixelSize: 12 }
-                Text { text: "And everything slows"; color: "#fff"; font.pixelSize: 14; font.weight: Font.DemiBold }
-                Text { text: "We follow it home"; color: "#8A5A53"; font.pixelSize: 12 } } } } }
+                Text { text: "City lights on the glass"; color: "#8A5A53"; font.pixelSize: 12 }
+                Text { text: "Radio turned down low"; color: "#fff"; font.pixelSize: 14; font.weight: Font.DemiBold }
+                Text { text: "Nowhere left to be"; color: "#8A5A53"; font.pixelSize: 12 } } } } }
 
     Component { id: dWindows; Item { id: r; property int i: 0; function restart() { tm.restart() }
         Timer { id: tm; interval: 1500; repeat: true; running: true; onTriggered: r.i = (r.i + 1) % 3 }
@@ -342,10 +342,10 @@ Window {
             Rectangle { visible: r.i === 0; x: 200; anchors.verticalCenter: parent.verticalCenter; width: 120; height: 5; radius: 2.5; color: "#2B2B31"
                 Rectangle { width: 66; height: 5; radius: 2.5; color: "#fff" } }
             Text { visible: r.i === 1; x: 76; anchors.verticalCenter: parent.verticalCenter; text: "Charging  ·  70%"; color: "#fff"; font.pixelSize: 13 }
-            Text { visible: r.i === 2; x: 76; y: 14; text: "Time for water"; color: "#fff"; font.pixelSize: 14; font.weight: Font.DemiBold }
-            Text { visible: r.i === 2; x: 76; y: 36; text: "3 of 8 glasses today"; color: "#9A9AA3"; font.pixelSize: 12 } } } }
+            Text { visible: r.i === 2; x: 76; y: 14; text: "Stand up and stretch"; color: "#fff"; font.pixelSize: 14; font.weight: Font.DemiBold }
+            Text { visible: r.i === 2; x: 76; y: 36; text: "You have been sitting for an hour"; color: "#9A9AA3"; font.pixelSize: 12 } } } }
 
-    Component { id: dDictate; Item { id: r; property string full: "Hey Sam, I'm running fifteen minutes late."; property int n: 0; function restart() { n = 0; tm.restart() }
+    Component { id: dDictate; Item { id: r; property string full: "Hi Maya, the report is nearly done. Sending it at five."; property int n: 0; function restart() { n = 0; tm.restart() }
         Timer { id: tm; interval: 60; repeat: true; running: true; onTriggered: r.n = (r.n + 1) % (r.full.length + 30) }
         MiniNotch { w: 300; h: 44
             Rectangle { x: 14; anchors.verticalCenter: parent.verticalCenter; width: 8; height: 8; radius: 4; color: "#FF3B30" }
@@ -358,7 +358,7 @@ Window {
         Timer { id: tm; interval: 1600; repeat: true; running: true; onTriggered: r.i = (r.i + 1) % 3 }
         MiniNotch { w: r.i === 1 ? 480 : 440; h: r.i === 1 ? 92 : 44; panel: r.i === 1
             Eyes { x: 20; y: r.i === 1 ? 18 : 11; tint: r.i === 0 ? "#5CE1FF" : r.i === 1 ? "#FFB340" : "#34D399"; happy: r.i === 2 }
-            Text { x: 76; y: r.i === 1 ? 16 : 14; text: r.i === 0 ? "Claude is editing server.ts" : r.i === 1 ? "Claude needs your permission" : "Claude finished in 4m 12s"; color: "#fff"; font.pixelSize: 13; font.weight: Font.DemiBold }
+            Text { x: 76; y: r.i === 1 ? 16 : 14; text: r.i === 0 ? "Claude is editing api.py" : r.i === 1 ? "Claude is waiting for your OK" : "Claude finished in 3m 05s"; color: "#fff"; font.pixelSize: 13; font.weight: Font.DemiBold }
             Row { visible: r.i === 1; anchors.right: parent.right; anchors.rightMargin: 24; y: 54; spacing: 8
                 Rectangle { width: 64; height: 28; radius: 14; color: "#24242A"; Text { anchors.centerIn: parent; text: "Deny"; color: "#fff"; font.pixelSize: 12; font.weight: Font.DemiBold } }
                 Rectangle { width: 74; height: 28; radius: 14; color: "#FFB340"; Text { anchors.centerIn: parent; text: "Approve"; color: "#000"; font.pixelSize: 12; font.weight: Font.DemiBold } } } } } }

@@ -27,6 +27,7 @@ DEFAULT_SETTINGS = {
     "claude_speak": {"done": True, "needs_you": True, "error": True},
     "claude_quiet_when_focused": True,
     "greeting": True,
+    "lyrics": True,
     "onboarded": False,
     "stt_model": "base.en",
     "websites": ["youtube.com", "github.com", "gmail.com"],

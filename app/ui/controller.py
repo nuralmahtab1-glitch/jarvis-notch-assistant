@@ -6,23 +6,23 @@ from PySide6.QtGui import QCursor, QGuiApplication
 from app import config
 
 TOOLTIPS = {
-    "dictate": ("Dictate", "Talk, and your words appear where you type."),
-    "write": ("Write", f"Say what you need, and {config.APP_NAME} writes it for you."),
-    "command": ("Command", "Point at something, or tell me what to do."),
-    "widgets": ("Widgets", "The time around the world, your list, battery and weather."),
-    "controls": ("Controls", "Volume, brightness, Wi-Fi, power mode and a screenshot."),
-    "apps": ("Apps", "Your pinned apps, one click away."),
-    "shelf": ("Shelf", "What you copied and the files you dropped, kept here."),
-    "timer": ("Timer", "Focus sessions, the clock and your reminders."),
-    "menu": ("Menu", "Your sites, the guide, the teleprompter and more."),
+    "dictate": ("Dictate", "Speak, and clean text lands wherever your cursor is."),
+    "write": ("Write", f"Tell {config.APP_NAME} what you need and it drafts it for you."),
+    "command": ("Command", "Ask me to do something on your PC."),
+    "widgets": ("Widgets", "Your list, the clock, battery and what is coming up."),
+    "controls": ("Controls", "Sound, screen brightness, power and a quick screenshot."),
+    "apps": ("Apps", "Your favourite apps, a click away."),
+    "shelf": ("Shelf", "Things you copied or dropped, parked until you need them."),
+    "timer": ("Timer", "Focus sessions, reminders and the clock."),
+    "menu": ("Menu", "Shortcuts, the guide and more."),
 }
 DEFAULT_TEXT = {
-    "expanded": (f"Ready. Say {config.WAKE_PHRASE}.", "Or tap one of the three buttons above."),
-    "listening": ("Listening", ""), "hearing": ("...", ""), "working": ("Working on it", ""),
+    "expanded": ("At your service.", f"Say {config.WAKE_PHRASE}, or press a button above."),
+    "listening": ("Listening", ""), "hearing": ("...", ""), "working": ("On it", ""),
     "recording": ("Listening", ""), "done": ("Done", ""), "speaking": ("", ""),
-    "confirm": ("Are you sure?", ""), "volume": ("Volume", ""), "reminder": ("Reminder", ""),
-    "claudeWorking": ("Claude is working", ""), "claudeNeeds": ("Claude needs your permission", ""),
-    "claudeDone": ("Claude finished", ""), "claudeError": ("Claude hit an error", ""),
+    "confirm": ("Shall I go ahead?", ""), "volume": ("Volume", ""), "reminder": ("Reminder", ""),
+    "claudeWorking": ("Claude is working", ""), "claudeNeeds": ("Claude is waiting for your OK", ""),
+    "claudeDone": ("Claude finished", ""), "claudeError": ("Claude hit a problem", ""),
 }
 MODES = ["idle", "sleeping", "expanded", "listening", "hearing", "working", "done", "recording",
          "speaking", "confirm", "volume", "reminder", "music", "focus", "todo",
@@ -35,12 +35,12 @@ SIZES = {  # width, height
     "claudeWorking": (440, 44), "claudeNeeds": (500, 96), "claudeDone": (500, 76), "claudeError": (400, 44),
 }
 DEMO_TEXT = {
-    "hearing": ("Remind me to call Mom at six", ""), "speaking": ("Of course.", ""),
-    "confirm": ("Send the slides to Sam?", "I will only do it if you say so."),
-    "reminder": ("Time for water", "3 of 8 glasses today"),
-    "claudeWorking": ("Claude is editing server.ts", "2:14"),
-    "claudeNeeds": ("Claude needs your permission", "Run: npm test"),
-    "claudeDone": ("Claude finished in 4m 12s", "I fixed the bug and the tests pass."),
+    "hearing": ("Remind me to water the plants at six", ""), "speaking": ("Certainly.", ""),
+    "confirm": ("Email the report to Maya?", "Nothing is sent until you say so."),
+    "reminder": ("Stand up and stretch", "You have been sitting for an hour"),
+    "claudeWorking": ("Claude is editing api.py", "1:48"),
+    "claudeNeeds": ("Claude is waiting for your OK", "Run: pytest"),
+    "claudeDone": ("Claude finished in 3m 05s", "Added the login page and the tests pass."),
 }
 
 
@@ -60,13 +60,13 @@ class NotchController(QObject):
         self._level = -1.0         # <0 means "no live level, use the idle animation"
         self._last_active = time.monotonic()
         self._sleep_after = float(os.environ.get("JARVIS_SLEEP_SECONDS", config.IDLE_SLEEP_SECONDS))
-        self._todo = [{"id": 1, "text": "Buy coffee beans", "done": False}, {"id": 2, "text": "Book the dentist", "done": False},
-                      {"id": 3, "text": "Reply to Sam", "done": True}, {"id": 4, "text": "Call Mom at six", "done": True}]
+        self._todo = [{"id": 1, "text": "Water the plants", "done": False}, {"id": 2, "text": "Pay the electricity bill", "done": False},
+                      {"id": 3, "text": "Email the landlord", "done": True}, {"id": 4, "text": "Call Dad at six", "done": True}]
         self._focus_left, self._focus_total = 18 * 60 + 39, 25 * 60
         self._external_focus = False
         self._demo_text = demo_text
-        self._music = {"title": "Golden Hour", "artist": "The Quiet Hours", "frac": 0.32,
-                       "lyrics": ["The light comes in low", "And everything slows", "We follow it home"]}
+        self._music = {"title": "Late Night Drive", "artist": "Nova Park", "frac": 0.32,
+                       "lyrics": ["City lights on the glass", "Radio turned down low", "Nowhere left to be"]}
         self._busy_until = 0.0     # user/assistant interaction in progress: do not auto-sleep
         self._demo = QTimer(self); self._demo.timeout.connect(self._next_demo); self._demo_i = 0
         self._poll = QTimer(self); self._poll.setInterval(33); self._poll.timeout.connect(self._tick); self._poll.start()

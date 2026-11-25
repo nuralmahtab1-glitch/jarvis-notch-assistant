@@ -1,0 +1,11 @@
+Jarvis - made by Nur Al Mahtab
+Copyright (c) 2026 Nur Al Mahtab. All rights reserved.
+
+This source is provided for the author's own use. You may not copy, redistribute or sell it
+without the author's written permission. (The author may replace this with an open-source
+licence at any time.)
+
+Third-party components keep their own licences:
+Qt for Python / PySide6 (LGPLv3), faster-whisper and CTranslate2 (MIT), Whisper weights (MIT),
+openWakeWord (Apache-2.0; "hey jarvis" model CC BY-NC-SA 4.0 - check before commercial use),
+Piper (MIT) and the en_GB-alan voice (see its model card), numpy, psutil, Pillow, sounddevice.

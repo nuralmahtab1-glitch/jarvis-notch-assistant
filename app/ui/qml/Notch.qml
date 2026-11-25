@@ -42,6 +42,21 @@ Window {
     readonly property bool isCompact: !isTiny && !isPanel && !isCard
     readonly property bool sleeping: mode === "sleeping"
 
+    // Click shield: Approve/Deny/Confirm ignore clicks for a moment after a card appears, so a click
+    // meant for the app underneath can never approve something by accident.
+    property bool armed: true
+    property string shieldMode: ""
+    Connections {
+        target: notch
+        function onChanged() {
+            if (notch.mode === win.shieldMode) return
+            win.shieldMode = notch.mode
+            if (notch.mode === "claudeNeeds" || notch.mode === "confirm") { win.armed = false; armTimer.restart() }
+            else win.armed = true
+        }
+    }
+    Timer { id: armTimer; interval: 700; onTriggered: win.armed = true }
+
     function stateColor() {
         if (mode === "claudeNeeds") return th.warn
         if (mode === "claudeError") return th.bad
@@ -246,8 +261,8 @@ Window {
                 anchors.right: parent.right; anchors.rightMargin: th.flare + 18
                 anchors.bottom: parent.bottom; anchors.bottomMargin: 12
                 spacing: 8
-                Pill { label: win.mode === "claudeNeeds" ? "Deny" : "Not now"; fg: th.text1; bg: "#24242A"; onClicked: notch.act(win.mode === "claudeNeeds" ? "deny" : "cancel") }
-                Pill { label: win.mode === "claudeNeeds" ? "Approve" : "Confirm"; fg: "#000000"; bg: win.mode === "claudeNeeds" ? th.warn : "#FFFFFF"; onClicked: notch.act(win.mode === "claudeNeeds" ? "approve" : "confirm") }
+                Pill { enabled: win.armed; label: win.mode === "claudeNeeds" ? "Deny" : "Not now"; fg: th.text1; bg: "#24242A"; onClicked: notch.act(win.mode === "claudeNeeds" ? "deny" : "cancel") }
+                Pill { enabled: win.armed; label: win.mode === "claudeNeeds" ? "Approve" : "Confirm"; fg: "#000000"; bg: win.mode === "claudeNeeds" ? th.warn : "#FFFFFF"; onClicked: notch.act(win.mode === "claudeNeeds" ? "approve" : "confirm") }
             }
             Row {
                 visible: win.mode === "reminder"
@@ -282,11 +297,11 @@ Window {
                 y: 12; height: 34; spacing: 14
                 Text { text: notch.clock; color: th.text3; anchors.verticalCenter: parent.verticalCenter
                     font.family: th.font; font.pixelSize: 11; font.features: { "tnum": 1 } }
+                TabIcon { glyph: ""; key: "timer"; onClicked: notch.setMode("focus") }
                 TabIcon { glyph: ""; key: "widgets"; onClicked: notch.setMode("todo") }
+                TabIcon { glyph: ""; key: "shelf" }
                 TabIcon { glyph: ""; key: "controls"; onClicked: notch.setMode("volume") }
                 TabIcon { glyph: ""; key: "apps" }
-                TabIcon { glyph: ""; key: "shelf" }
-                TabIcon { glyph: ""; key: "timer"; onClicked: notch.setMode("focus") }
                 TabIcon { glyph: ""; key: "menu"; onClicked: notch.setMode("music") }
             }
 
@@ -428,7 +443,7 @@ Window {
         property string mood: "normal"
         property real lookX: 0
         property real lookY: 0
-        property color tint: "#FFFFFF"
+        property color tint: "#E4F7FF"
         property bool blinking: false
         width: 40; height: 22
         Timer { interval: 3200 + Math.random() * 3800; running: eyes.mood === "normal"; repeat: true
@@ -445,9 +460,9 @@ Window {
                 Rectangle { // open eye
                     visible: eyes.mood === "normal" || eyes.mood === "alert"
                     anchors.horizontalCenter: parent.horizontalCenter; anchors.verticalCenter: parent.verticalCenter
-                    width: eyes.mood === "alert" ? 8 : 7
-                    height: eyes.blinking ? 2 : (eyes.mood === "alert" ? 16 : 14)
-                    radius: width / 2; color: eyes.tint
+                    width: eyes.mood === "alert" ? 10 : 12
+                    height: eyes.blinking ? 1.6 : (eyes.mood === "alert" ? 11 : 7)
+                    radius: height / 2; color: eyes.tint
                     Behavior on height { NumberAnimation { duration: 70 } }
                 }
                 Shape { // happy ^ or sleepy curve
@@ -491,11 +506,12 @@ Window {
         property color bg: "#24242A"
         signal clicked()
         width: lbl.implicitWidth + 28; height: 30; radius: 15; color: bg
+        opacity: pill.enabled ? 1 : 0.35
         scale: pm.pressed ? 0.95 : 1
         Behavior on scale { NumberAnimation { duration: 90 } }
         Text { id: lbl; anchors.centerIn: parent; text: pill.label; color: pill.fg
             font.family: th.font; font.pixelSize: 12; font.weight: Font.DemiBold }
-        MouseArea { id: pm; anchors.fill: parent; onClicked: pill.clicked() }
+        MouseArea { id: pm; anchors.fill: parent; enabled: pill.enabled; onClicked: pill.clicked() }
     }
 
     component RoundBtn: Rectangle {
