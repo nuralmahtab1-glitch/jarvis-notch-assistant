@@ -43,6 +43,7 @@ class Assistant(QObject):
         self._focus_total = 0
         self._focus_label = "Focus"
         self._claude_seen: dict[str, str] = {}
+        self.shelf = None                  # set by main: the Shelf controller
         self.qs = qs                       # quick-settings backend (swappable in tests)
         self._ctl_tick = 0
         self._brightness_lock = threading.Lock()
@@ -73,7 +74,7 @@ class Assistant(QObject):
         m = self.speak_mode
         return m == "always" or (m == "voice" and src in ("key", "wake"))
 
-    CARD_MODES = ("todo", "volume", "focus", "music", "controls")
+    CARD_MODES = ("todo", "volume", "focus", "music", "controls", "shelf")
 
     def say(self, text: str, src: str = "key", mode: str = "done", hold: float = 2.6):
         """Show the reply in the notch and speak it if the interaction was by voice.
@@ -320,6 +321,11 @@ class Assistant(QObject):
             if it.name == "night_light_toggle":
                 self.qs.open_settings_page("nightlight")
                 return "Windows does not let apps switch night light, so I opened its settings."
+            if it.name == "shelf_open":
+                self.ctl.wake()
+                if self.shelf:
+                    self.shelf.opened()
+                self.ctl.setMode("shelf"); return ""
             if it.name == "controls_open":
                 self.open_controls(); return ""
             if it.name == "claude_status":

@@ -165,6 +165,10 @@ Window {
                 Column { visible: win.page === 5; width: parent.width; spacing: 0
                     SRow { title: "Synced lyrics"; desc: "Asks lrclib.net for lyrics using only the song title, artist and length. Off keeps music fully offline."
                         Switch2 { checked: win.v.lyrics; onToggled: sc.set("lyrics", on) } }
+                    SRow { title: "Clipboard shelf"; desc: "Keeps your recent copies for the notch's Shelf. Memory only: never saved to disk. Passwords and anything marked \u201Cdo not record\u201D are skipped."
+                        Row { spacing: 12
+                            Btn { label: "Clear"; onClicked: sc.clearShelf() }
+                            Switch2 { checked: win.v.shelf_enabled; onToggled: sc.set("shelf_enabled", on) } } }
                     SRow { title: "Export my data"; desc: "Saves your list, reminders and settings as a readable file in Documents."
                         Btn { label: "Export"; onClicked: sc.exportData() } }
                     SRow { title: "Erase my list and reminders"; desc: "Permanently deletes them. Settings are kept."

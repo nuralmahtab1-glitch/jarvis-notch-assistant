@@ -192,6 +192,8 @@ def parse(text: str, now: datetime | None = None) -> Intent | None:
         return Intent("power_mode_set", {"mode": mode}) if mode else Intent("controls_open")
     if re.search(r"night light", t):
         return Intent("night_light_toggle")
+    if re.search(r"(open|show|bring up) (my |the )?(shelf|clipboard)|what did i (just )?copy|my clipboard", t):
+        return Intent("shelf_open")
     if re.search(r"(open|show|bring up) (the )?(controls|quick settings|control panel)", t):
         return Intent("controls_open")
     if re.search(r"battery( level| status| percentage)?|how much battery", t):

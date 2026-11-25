@@ -28,6 +28,7 @@ DEFAULT_SETTINGS = {
     "claude_quiet_when_focused": True,
     "greeting": True,
     "lyrics": True,
+    "shelf_enabled": True,
     "onboarded": False,
     "stt_model": "base.en",
     "llm_model": "qwen3-1.7b",

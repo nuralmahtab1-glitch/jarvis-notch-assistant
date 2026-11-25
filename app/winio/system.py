@@ -237,3 +237,8 @@ def chime() -> None:
 
 def is_muted() -> bool:
     return bool(_endpoint().GetMute())
+
+
+def press_ctrl_v() -> None:
+    """Send Ctrl+V to whichever window is in front (used by the Shelf's Paste)."""
+    _send([_key(VK_CONTROL), _key(VK_V), _key(VK_V, flags=KEYEVENTF_KEYUP), _key(VK_CONTROL, flags=KEYEVENTF_KEYUP)])

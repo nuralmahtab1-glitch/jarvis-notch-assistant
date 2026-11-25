@@ -58,6 +58,18 @@ file up first, keeps your own hooks, and tags its entries so **Disconnect** remo
 - Hooks call a tiny stdlib-only helper (`app/claude_bridge/hook.py`) that talks to a loopback-only, token-protected
   local server. If Jarvis is not running the helper exits silently and instantly.
 
+## Shelf (clipboard history + parked files)
+
+Hover the notch and use the tab icon, say "show my shelf", or **drag a file or text onto the notch** (it opens
+by itself and the drop parks it).
+
+- Shows your recent copies (text and files), newest first. **Click** an item to copy it back, **Paste** types it
+  into the window you were just in (only if you are still in it), **x** removes it, **Clear shelf** empties it.
+- Drag an item out to drop it into another app (text, or the real file).
+- **Privacy:** memory only, never written to disk, gone when Jarvis closes. It ignores anything an app marked
+  "do not record" (password managers do this), and anything that looks like a password or API key. Max 30 items,
+  2000 characters each. Switch it off, or clear it, in Settings > Privacy.
+
 ## Controls panel (quick settings in the notch)
 
 Hover the notch, then click the sliders icon (or say "open the controls"). It shows the real state of your PC and
@@ -113,7 +125,9 @@ now-playing + synced lyrics, tray menu, 17-step onboarding.
 **Not built yet:**
 - A full **Models page** for cloud providers / API keys (the local brain below is built).
 - Adding your own models by file or Ollama name (the Settings window lists the built-in Qwen3 models only).
-- **Shelf / Apps** panels, world clocks, weather, teleprompter. Their tab icons show tooltips only.
+- **Apps** panel, world clocks, weather, teleprompter. Their tab icons show tooltips only.
+- Dragging an item **out of** the Shelf into another app uses Qt's native drag, which I could not exercise
+  automatically (dropping *in* is tested with synthesized events). Click to copy and the Paste button are tested.
 - A real on/off switch for **night light, battery saver and accessibility**: Windows gives apps no supported way to
   do that, so those tiles open the matching Windows Settings page instead.
 - **Browser extension** for claude.ai/code, and a Windows **installer**.
@@ -123,7 +137,7 @@ now-playing + synced lyrics, tray menu, 17-step onboarding.
 ## Tests
 
 ```powershell
-.venv\Scripts\python.exe -m pytest tests -q     # 148 tests
+.venv\Scripts\python.exe -m pytest tests -q     # 186 tests
 ```
 
 Live checks (need a real screen/speakers): `tests/live_winio_check.py`, `tests/live_voice_roundtrip.py`,

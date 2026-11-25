@@ -106,7 +106,7 @@ class SettingsController(QObject):
     def _validate(self, key, v):
         try:
             if key in ("wake_word", "dnd", "greeting", "claude_bridge", "claude_hide_details",
-                       "claude_quiet_when_focused", "lyrics", "speak_done", "speak_needs", "speak_error"):
+                       "claude_quiet_when_focused", "lyrics", "shelf_enabled", "speak_done", "speak_needs", "speak_error"):
                 return bool(v)
             if key == "address":
                 v = str(v).strip()[:40]
@@ -166,6 +166,8 @@ class SettingsController(QObject):
             self.hooks["wake"](v)
         elif key == "lyrics" and "lyrics" in self.hooks:
             self.hooks["lyrics"](v)
+        elif key == "shelf_enabled" and "shelf" in self.hooks:
+            self.hooks["shelf"](v)
         elif key == "llm_model" and a.local:
             a.local.stop()                       # next question loads the newly chosen model
 
@@ -232,6 +234,12 @@ class SettingsController(QObject):
         path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
         self._say(f"Saved to {path}")
         return str(path)
+
+    @Slot()
+    def clearShelf(self):
+        if "shelf_clear" in self.hooks:
+            self.hooks["shelf_clear"]()
+        self._say("Shelf cleared.")
 
     @Slot()
     def wipeData(self):

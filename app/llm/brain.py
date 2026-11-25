@@ -26,7 +26,7 @@ TOOLS: dict[str, dict[str, str]] = {
     "go_to_sleep": {}, "claude_status": {}, "claude_approve": {}, "claude_deny": {},
     "wifi_toggle": {"on": "true, false, or omit to toggle"}, "bluetooth_toggle": {"on": "true, false, or omit to toggle"},
     "airplane_toggle": {"on": "true, false, or omit to toggle"}, "night_light_toggle": {},
-    "power_mode_set": {"mode": "efficiency, balanced or performance"}, "controls_open": {},
+    "power_mode_set": {"mode": "efficiency, balanced or performance"}, "controls_open": {}, "shelf_open": {},
     "write_text": {"instruction": "what to write, e.g. 'a polite email asking for a deadline extension'"},
 }
 INT_ARGS = {"minutes": 25, "level": 50, "delta": 10}
@@ -220,6 +220,7 @@ class Brain:
         "brightness_change": re.compile(r"bright|dim|dark|glare|screen|display|monitor|light", re.I),
         "volume_set": re.compile(r"volume|loud|quiet|sound|audio|speaker|hear|decibel|turn it", re.I),
         "volume_change": re.compile(r"volume|loud|quiet|sound|audio|speaker|hear|turn it|up|down", re.I),
+        "shelf_open": re.compile(r"shelf|clipboard|copied|copy|paste", re.I),
         "wifi_toggle": re.compile(r"wi-?fi|wireless|internet|network|online", re.I),
         "bluetooth_toggle": re.compile(r"blue ?tooth", re.I),
         "airplane_toggle": re.compile(r"air ?plane|flight|offline", re.I),

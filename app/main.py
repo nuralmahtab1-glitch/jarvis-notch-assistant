@@ -58,6 +58,10 @@ def main() -> int:
     ctl = NotchController(demo_text=bool(args.demo or args.shots))
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("notch", ctl)
+    from app.ui.shelf_ctl import ShelfController
+    from app.winio import system as winsys
+    shelf_ctl = ShelfController(ctl, system=winsys, demo=bool(args.shots or args.demo))
+    engine.rootContext().setContextProperty("shelf", shelf_ctl)
     engine.warnings.connect(lambda ws: [print("QML:", w.toString(), file=sys.stderr) for w in ws])
     engine.load(QUrl.fromLocalFile(str(QML)))
     if not engine.rootObjects():
@@ -168,6 +172,10 @@ def main() -> int:
         media.start()
         app.aboutToQuit.connect(media.stop)
         hooks["lyrics"] = lambda on: setattr(media, "use_lyrics", on)
+        shelf_ctl.set_enabled(bool(settings["shelf_enabled"]))
+        hooks["shelf"] = shelf_ctl.set_enabled
+        hooks["shelf_clear"] = shelf_ctl.clear
+        assistant.shelf = shelf_ctl
         if settings["onboarded"] and speaker and not args.say:
             QTimer.singleShot(3000, assistant.greet_if_due)      # once per day
         if args.say:

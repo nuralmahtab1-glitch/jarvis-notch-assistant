@@ -37,7 +37,7 @@ Window {
 
     readonly property string mode: notch.mode
     readonly property bool isTiny: mode === "idle" || mode === "sleeping" || mode === "peek"
-    readonly property bool isPanel: mode === "expanded" || mode === "music" || mode === "focus" || mode === "todo" || mode === "controls"
+    readonly property bool isPanel: mode === "expanded" || mode === "music" || mode === "focus" || mode === "todo" || mode === "controls" || mode === "shelf"
     readonly property bool isCard: mode === "confirm" || mode === "claudeNeeds" || mode === "reminder" || mode === "claudeDone" || mode === "answer"
     readonly property bool isCompact: !isTiny && !isPanel && !isCard
     readonly property bool sleeping: mode === "sleeping"
@@ -102,6 +102,12 @@ Window {
         }
 
         HoverHandler { id: hh; onHoveredChanged: notch.bodyHover(hovered) }
+        // Dragging a file or text onto the notch opens the shelf; dropping parks it there.
+        DropArea {
+            anchors.fill: parent
+            onEntered: (d) => { if (notch.mode !== "shelf") { shelf.opened(); notch.setMode("shelf") } }
+            onDropped: (d) => { if (d.hasUrls) shelf.dropUrls(d.urls); else if (d.hasText) shelf.dropText(d.text); d.accept() }
+        }
         scale: sleeping ? sleepPulse.v : 1.0
         transformOrigin: Item.Top
         QtObject { id: sleepPulse; property real v: 1.0 }
@@ -299,7 +305,7 @@ Window {
                     font.family: th.font; font.pixelSize: 11; font.features: { "tnum": 1 } }
                 TabIcon { glyph: ""; key: "timer"; onClicked: notch.setMode("focus") }
                 TabIcon { glyph: ""; key: "widgets"; onClicked: notch.setMode("todo") }
-                TabIcon { glyph: ""; key: "shelf" }
+                TabIcon { glyph: ""; key: "shelf"; onClicked: { shelf.opened(); notch.setMode("shelf") } }
                 TabIcon { glyph: ""; key: "controls"; onClicked: notch.act("open_controls") }
                 TabIcon { glyph: ""; key: "apps" }
                 TabIcon { glyph: ""; key: "menu"; onClicked: notch.setMode("music") }
@@ -480,6 +486,80 @@ Window {
                 Text { x: th.flare + 20 + 134; y: 197; width: 340; elide: Text.ElideRight; text: notch.controls.msg; color: th.accent
                     font.family: th.font; font.pixelSize: 12 }
                 Text { x: th.flare + 20; y: 236; text: "Wi-Fi and Bluetooth are real switches. Battery saver, night light and accessibility open their Windows pages."
+                    color: th.text3; font.family: th.font; font.pixelSize: 10 }
+            }
+
+            // ---- SHELF (clipboard history + parked files) ----
+            Item {
+                visible: win.mode === "shelf"; anchors.fill: parent
+                // drop zone (the whole notch accepts drops; this just shows where)
+                Rectangle {
+                    x: th.flare + 20; y: 20; width: 150; height: 176; radius: 18; color: "#101014"
+                    border.width: 1.5; border.color: shelfDrop.containsDrag ? th.accent : "#2B2B31"
+                    Behavior on border.color { ColorAnimation { duration: 120 } }
+                    Column { anchors.centerIn: parent; spacing: 8; width: parent.width - 28
+                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: ""; font.family: th.icons; font.pixelSize: 26
+                            color: shelfDrop.containsDrag ? th.accent : th.text3 }
+                        Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
+                            text: shelfDrop.containsDrag ? "Release to park it" : "Drop files or text here to park them"
+                            color: th.text2; font.family: th.font; font.pixelSize: 11 } }
+                    DropArea { id: shelfDrop; anchors.fill: parent }
+                }
+                // items
+                Flickable {
+                    id: shelfFlick
+                    x: th.flare + 190; y: 18; width: 540 - 190 - th.flare; height: 182
+                    clip: true; contentHeight: shelfCol.height; boundsBehavior: Flickable.StopAtBounds
+                    Text { visible: shelf.count === 0; width: parent.width; topPadding: 54; horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap; color: th.text3; font.family: th.font; font.pixelSize: 12
+                        text: shelf.enabled ? "Nothing here yet.\nCopy something, or drop a file on the notch." : "The shelf is switched off in Settings." }
+                    Column {
+                        id: shelfCol; width: shelfFlick.width; spacing: 4
+                        Repeater {
+                            model: shelf.items
+                            delegate: Rectangle {
+                                id: srow
+                                required property var modelData
+                                width: shelfCol.width; height: 44; radius: 12
+                                color: rm.containsMouse || rm.drag.active ? "#222228" : "#141418"
+                                Rectangle { x: 8; y: 8; width: 28; height: 28; radius: 8; color: "#24242A"
+                                    Text { anchors.centerIn: parent; text: srow.modelData.kind === "file" ? "" : ""
+                                        font.family: th.icons; font.pixelSize: 13; color: th.text2 } }
+                                Column { x: 46; y: 7; width: parent.width - 46 - 66; spacing: 1
+                                    Text { width: parent.width; elide: Text.ElideRight; text: srow.modelData.title; color: th.text1
+                                        font.family: th.font; font.pixelSize: 12; font.weight: Font.Medium }
+                                    Text { width: parent.width; elide: Text.ElideMiddle; text: srow.modelData.sub; color: th.text3
+                                        font.family: th.font; font.pixelSize: 10 } }
+                                MouseArea {
+                                    id: rm; anchors.fill: parent; anchors.rightMargin: 66; hoverEnabled: true
+                                    drag.target: dragProxy
+                                    onClicked: shelf.copy(srow.modelData.id)
+                                }
+                                // invisible drag source: dragging an item out starts a real drag into other apps
+                                Item { id: dragProxy; width: 1; height: 1
+                                    Drag.active: rm.drag.active
+                                    Drag.dragType: Drag.Automatic
+                                    Drag.supportedActions: Qt.CopyAction
+                                    Drag.mimeData: srow.modelData.kind === "file"
+                                        ? { "text/uri-list": srow.modelData.url } : { "text/plain": srow.modelData.full } }
+                                Row { anchors.right: parent.right; anchors.rightMargin: 8; y: 10; spacing: 6
+                                    Rectangle { width: 24; height: 24; radius: 12; color: pm.containsMouse ? th.accent : "#2A2A31"
+                                        Text { anchors.centerIn: parent; text: ""; font.family: th.icons; font.pixelSize: 12
+                                            color: pm.containsMouse ? "#001018" : th.text1 }
+                                        MouseArea { id: pm; anchors.fill: parent; hoverEnabled: true; onClicked: shelf.paste(srow.modelData.id) } }
+                                    Rectangle { width: 24; height: 24; radius: 12; color: xm.containsMouse ? th.bad : "#2A2A31"
+                                        Text { anchors.centerIn: parent; text: "✕"; font.pixelSize: 10; color: xm.containsMouse ? "#fff" : th.text2 }
+                                        MouseArea { id: xm; anchors.fill: parent; hoverEnabled: true; onClicked: shelf.remove(srow.modelData.id) } }
+                                }
+                            }
+                        }
+                    }
+                }
+                // footer
+                Pill { x: th.flare + 20; y: 214; label: "Clear shelf"; fg: th.text1; bg: "#24242A"; enabled: shelf.count > 0; onClicked: shelf.clear() }
+                Text { x: th.flare + 20 + 112; y: 221; width: 330; elide: Text.ElideRight; text: shelf.message; color: th.accent
+                    font.family: th.font; font.pixelSize: 12 }
+                Text { anchors.right: parent.right; anchors.rightMargin: th.flare + 20; y: 223; text: "Memory only. Never saved."
                     color: th.text3; font.family: th.font; font.pixelSize: 10 }
             }
 

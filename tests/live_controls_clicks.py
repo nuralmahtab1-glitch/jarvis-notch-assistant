@@ -30,6 +30,12 @@ mod.win.battery = lambda: (77, True)
 d = Path(tempfile.mkdtemp())
 ctl = NotchController(); a = Assistant(ctl, Settings(d / "s.json"), Store(d / "t.db")); a.qs = FakeQS()
 eng = QQmlApplicationEngine(); eng.rootContext().setContextProperty("notch", ctl)
+from app.ui.shelf_ctl import ShelfController
+from PySide6.QtCore import QObject, Signal
+class _Clip(QObject):
+    dataChanged = Signal()
+    def mimeData(self): return None
+shelf = ShelfController(ctl, clipboard=_Clip()); eng.rootContext().setContextProperty("shelf", shelf)
 eng.load(QUrl.fromLocalFile("app/ui/qml/Notch.qml"))
 w = eng.rootObjects()[0]; qw = wrapInstance(getCppPointer(w)[0], QQuickWindow)
 results = []
