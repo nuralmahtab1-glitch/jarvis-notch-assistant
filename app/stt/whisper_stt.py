@@ -31,6 +31,10 @@ class Transcriber:
                 ROOT.mkdir(parents=True, exist_ok=True)
                 self._model = WhisperModel(self.model_size, device="cpu", compute_type="int8",
                                            download_root=str(ROOT), cpu_threads=4)
+                try:                         # first real run is slow: do a throw-away one now
+                    list(self._model.transcribe(np.zeros(8000, dtype=np.float32), language="en", beam_size=1)[0])
+                except Exception:
+                    pass
         return self._model
 
     def transcribe(self, audio: np.ndarray, prompt: str = "") -> str:
@@ -40,6 +44,6 @@ class Transcriber:
         with self._tlock:
           segments, _ = model.transcribe(
               audio, language="en", beam_size=1, vad_filter=True,
-              vad_parameters={"min_silence_duration_ms": 400},
+              vad_parameters={"min_silence_duration_ms": 250},
               condition_on_previous_text=False, initial_prompt=prompt or None)
           return " ".join(s.text.strip() for s in segments).strip()

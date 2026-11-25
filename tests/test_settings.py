@@ -118,8 +118,8 @@ def test_mic_and_models_validated(env):
     sc, a, ctl, cfg, *_ = env
     sc.set("mic_device", "Mic B"); assert cfg["mic_device"] == "Mic B"
     sc.set("mic_device", "Ghost mic"); assert cfg["mic_device"] == "Mic B"
-    sc.set("stt_model", "huge"); assert cfg["stt_model"] == "base.en"
-    sc.set("stt_model", "tiny.en"); assert cfg["stt_model"] == "tiny.en"
+    sc.set("stt_model", "base.en"); assert cfg["stt_model"] == "base.en"
+    sc.set("stt_model", "huge"); assert cfg["stt_model"] == "base.en"            # unknown names are refused
     sc.set("llm_model", "qwen3-4b"); assert cfg["llm_model"] == "qwen3-4b"
     sc.set("llm_model", "gpt-9"); assert cfg["llm_model"] == "qwen3-4b"
 

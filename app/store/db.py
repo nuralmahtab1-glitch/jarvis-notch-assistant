@@ -34,7 +34,7 @@ DEFAULT_SETTINGS = {
     "clocks": ["London=Europe/London", "New York=America/New_York", "Tokyo=Asia/Tokyo"],
     "weather_city": "", "weather_place": "", "weather_lat": None, "weather_lon": None, "weather_units": "C",
     "onboarded": False,
-    "stt_model": "base.en",
+    "stt_model": "tiny.en",
     "llm_model": "qwen3-1.7b",
     "persona": "butler",
     "mic_device": "Default microphone",

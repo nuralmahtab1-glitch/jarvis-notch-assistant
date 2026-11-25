@@ -66,7 +66,7 @@ class Endpointer:
     """Decides when you have finished speaking, from the level of the recorded audio."""
 
     def __init__(self, get_audio: Callable[[], np.ndarray], on_end: Callable[[bool], None],
-                 silence: float = 1.1, no_speech_timeout: float = 6.0, max_len: float = 20.0, thresh: float = 0.012):
+                 silence: float = 0.7, no_speech_timeout: float = 6.0, max_len: float = 20.0, thresh: float = 0.012):
         self.get_audio, self.on_end = get_audio, on_end
         self.silence, self.no_speech, self.max_len, self.thresh = silence, no_speech_timeout, max_len, thresh
         self._stop = threading.Event()

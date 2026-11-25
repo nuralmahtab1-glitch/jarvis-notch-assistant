@@ -153,6 +153,14 @@ def main() -> int:
             from app.tts.engine import Speaker
             from app.stt.whisper_stt import Transcriber
             speaker = Speaker(speed=settings["voice_speed"])
+            def _warm_voice():                    # load the voice now so the first reply is not slow
+                try:
+                    for eng in speaker.engines:
+                        if hasattr(eng, "synth_wav"):
+                            eng.synth_wav("Ready.")
+                except Exception as e:
+                    print("[voice warm]", e)
+            threading.Thread(target=_warm_voice, daemon=True).start()
             stt = Transcriber(settings["stt_model"])
             threading.Thread(target=stt.load, daemon=True).start()      # warm the model in the background
             first_download = not stt.cached()
