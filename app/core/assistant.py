@@ -141,6 +141,12 @@ class Assistant(QObject):
             return
         self._partial_stop.clear()
         threading.Thread(target=self._partials, daemon=True).start()
+        self._endpointer = None
+        if src == "wake":                       # no key to release: detect the end of speech ourselves
+            from app.wake.listener import Endpointer
+            self._endpointer = Endpointer(self.rec.snapshot,
+                                          lambda spoke: self.ui(self._end if spoke else self.cancel_capture))
+            self._endpointer.start()
 
     def _partials(self):
         last = ""
@@ -159,9 +165,22 @@ class Assistant(QObject):
                 tail = txt if len(txt) <= 46 else "..." + txt[-44:]
                 self.ui(lambda t=tail: (self.ctl.setMode("hearing"), self.ctl.setText(t, "")) if self.busy else None)
 
+    def cancel_capture(self):
+        """Stop recording and throw the audio away (nobody spoke)."""
+        if getattr(self, "_endpointer", None):
+            self._endpointer.cancel()
+        self._partial_stop.set()
+        if self.rec:
+            self.rec.stop(); self.rec = None
+        self.busy = False
+        self.ctl.setLevel(-1)
+        self.ctl.setMode("idle")
+
     def _end(self):
         if not self.busy or not self.rec:
             return
+        if getattr(self, "_endpointer", None):
+            self._endpointer.cancel()
         self._partial_stop.set()
         audio = self.rec.stop()
         self.rec = None

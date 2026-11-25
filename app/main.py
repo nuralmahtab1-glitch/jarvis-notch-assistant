@@ -132,6 +132,12 @@ def main() -> int:
             keys = HoldKey({settings["ptt_command_key"]: make("command"), settings["ptt_dictate_key"]: make("dictate")})
             keys.start()
             app.aboutToQuit.connect(keys.stop)
+        if settings["wake_word"] and not args.no_voice and not args.no_keys:
+            from app.wake.listener import WakeListener
+            wake = WakeListener(on_wake=lambda: assistant.begin_capture("command", "wake"),
+                                is_blocked=lambda: assistant.busy or bool(speaker and speaker.speaking))
+            wake.start()
+            app.aboutToQuit.connect(wake.stop)
         if args.say:
             QTimer.singleShot(800, lambda: assistant.handle_text(args.say, "key"))
         app.assistant = assistant      # keep alive
