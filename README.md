@@ -11,6 +11,18 @@ telemetry, no cloud.
 > "Jarvis" is a working name (one constant in `app/config.py`). It is also a trademarked character name, so
 > rename it before you ever publish or sell this.
 
+## Quick start (for friends)
+
+1. **Download** `JarvisSetup.exe` from the [latest release](https://github.com/nuralmahtab1-glitch/jarvis-notch-assistant/releases/latest) (about 325 MB).
+2. **Run it.** Windows SmartScreen will warn because the app is not code-signed: click **More info**, then **Run anyway**. No administrator rights needed.
+3. **Wait about 30 seconds** the first time while the speech model downloads and loads. A small black pill appears at the top-centre of your screen.
+4. **Talk to it:** say **"Hey Jarvis"**, or hold **Right Ctrl** and speak a command (hold **Right Alt** to dictate into any app).
+5. **Try:** "what time is it", "set a timer for ten minutes", "open Spotify", "volume 40", "start the teleprompter".
+6. **Want it to answer questions and write for you?** Settings (tray icon, right-click) -> AI brain -> Download (about 1 GB, runs on your PC).
+
+Full guide: **[INSTRUCTIONS.md](INSTRUCTIONS.md)**. If it misbehaves, the log is `%APPDATA%\Jarvis\jarvis.log`; please open an
+[issue](https://github.com/nuralmahtab1-glitch/jarvis-notch-assistant/issues) with what you saw.
+
 ## Install it (Windows 10/11)
 
 Run **`dist\JarvisSetup.exe`** (about 325 MB, one file). It is a normal setup wizard: Welcome, Licence, folder and
