@@ -221,7 +221,9 @@ class Bridge:
             def log_message(self, *a): pass
 
             def _deny(self, code=403):
-                self.send_response(code); self.end_headers()
+                self.send_response(code)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
 
             def do_GET(self):
                 if self.path == "/health":
@@ -230,15 +232,16 @@ class Bridge:
                     self._deny(404)
 
             def do_POST(self):
+                n = min(int(self.headers.get("Content-Length", 0) or 0), 1_000_000)
+                raw = self.rfile.read(n) if n else b""          # always drain the body first
                 if self.client_address[0] != "127.0.0.1":
                     return self._deny()
                 if not hmac.compare_digest(self.headers.get("X-Jarvis-Token", ""), token):
                     return self._deny(401)
                 if self.path != "/hook":
                     return self._deny(404)
-                n = min(int(self.headers.get("Content-Length", 0)), 1_000_000)
                 try:
-                    ev = json.loads(self.rfile.read(n) or b"{}")
+                    ev = json.loads(raw or b"{}")
                 except ValueError:
                     return self._deny(400)
                 out = tracker_ref.handle(ev)
