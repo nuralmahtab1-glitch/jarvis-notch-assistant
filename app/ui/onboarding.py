@@ -34,8 +34,11 @@ class Onboarding(QObject):
     changed = Signal()
     finished = Signal()
 
-    def __init__(self, settings: Settings, speaker=None, claude_installer=None, mic_names=None):
+    def __init__(self, settings: Settings, speaker=None, claude_installer=None, mic_names=None, brain=None):
         super().__init__()
+        self.brain = brain
+        from PySide6.QtCore import QTimer
+        self._poll = QTimer(self); self._poll.setInterval(700); self._poll.timeout.connect(self.changed.emit); self._poll.start()
         self.cfg, self.speaker, self.claude = settings, speaker, claude_installer
         self._hw = detect_hardware()
         self._mics = mic_names or ["Default microphone"]
@@ -49,11 +52,31 @@ class Onboarding(QObject):
     address = Property(str, lambda s: s.cfg["address"], notify=changed)
     wake = Property(bool, lambda s: bool(s.cfg["wake_word"]), notify=changed)
     claudeConnected = Property(bool, lambda s: bool(s.claude and s.claude.is_connected()), notify=changed)
-    models = Property("QVariantList", lambda s: [
-        {"name": "Qwen3 1.7B", "tag": "Small", "size": "1.1 GB", "note": model_verdict(1.1, s._hw)},
-        {"name": "Qwen3 4B", "tag": "Standard", "size": "2.6 GB", "note": model_verdict(2.6, s._hw)},
-        {"name": "Qwen3 8B", "tag": "Large", "size": "5.0 GB", "note": model_verdict(5.0, s._hw)},
-    ], constant=True)
+    def _models(self):
+        from app.llm import manager
+        out = []
+        for m in manager.CATALOG:
+            dl = self.brain.brain_dl if self.brain else {"id": None, "state": "", "pct": 0}
+            if manager.is_installed(m["id"]) and manager.server_binary():
+                status = "Installed \u2713"
+            elif dl["id"] == m["id"] and dl["state"] == "downloading":
+                status = f"Downloading {dl['pct']}%"
+            elif dl["id"] == m["id"] and dl["state"] == "error":
+                status = "Failed - tap to retry"
+            else:
+                status = model_verdict(m["size_gb"], self._hw)
+            out.append({"id": m["id"], "name": m["name"], "size": f"{m['size_gb']} GB", "status": status,
+                        "tooBig": status == "Too large for this PC"})
+        return out
+
+    models = Property("QVariantList", _models, notify=changed)
+
+    @Slot(str)
+    def chooseModel(self, model_id: str):
+        if self.brain and not any(m["tooBig"] for m in self._models() if m["id"] == model_id):
+            self.cfg.set("llm_model", model_id)
+            self.brain.install_brain(model_id)
+            self.changed.emit()
 
     @Slot(str)
     def setAddress(self, name: str):

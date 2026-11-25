@@ -159,3 +159,74 @@ def test_dictation_fails_closed_when_window_changes(env, monkeypatch):
     a.insert_dictation("um hello there", hwnd=222)
     time.sleep(0.2)
     assert typed == ["Hello there."]
+
+
+# ---------------- AI brain wiring ----------------
+class FakeBackend:
+    def __init__(self, *replies): self.replies = list(replies)
+    def chat(self, messages, **kw): return self.replies.pop(0)
+
+
+def with_brain(env, *replies, ready=True):
+    from app.llm.brain import Brain
+    a, ctl, store, tracker, spk, cfg = env
+    a.brain = Brain(FakeBackend(*replies), ready=lambda: ready, name="Nur")
+    return a, ctl, store, spk
+
+
+def wait_for(qapp, cond, secs=3.0):
+    end = time.time() + secs
+    while time.time() < end and not cond():
+        qapp.processEvents(); time.sleep(0.01)
+    return cond()
+
+
+def test_unknown_phrase_goes_to_brain_and_runs_the_tool(env, qapp):
+    a, ctl, store, spk = with_brain(env, '{"tool": "todo_add", "args": {"text": "renew passport"}}')
+    a.handle_text("jot down that I need to renew my passport")
+    assert wait_for(qapp, lambda: store.todo_list())
+    assert store.todo_list()[0]["text"] == "renew passport"
+
+
+def test_brain_answer_is_shown_on_a_card_and_spoken_by_voice(env, qapp):
+    a, ctl, store, spk = with_brain(env, '{"answer": "Eight. Spiders are arachnids, not insects."}')
+    a.handle_text("how many legs does a spider have", src="key")
+    assert wait_for(qapp, lambda: ctl.mode == "answer")
+    assert ctl.title == "Eight." and "arachnids" in ctl.subtitle
+    assert spk.said and spk.said[-1].startswith("Eight")
+
+
+def test_brain_answer_is_silent_for_button_requests(env, qapp):
+    a, ctl, store, spk = with_brain(env, '{"answer": "Canberra."}')
+    a.handle_text("capital of australia", src="button")
+    assert wait_for(qapp, lambda: ctl.mode == "answer") and spk.said == []
+
+
+def test_no_brain_installed_gives_a_helpful_message(env, qapp):
+    a, ctl, store, spk = with_brain(env, ready=False)
+    a.handle_text("how many legs does a spider have", src="key")
+    assert "brain" in spk.said[-1] and "tray" in spk.said[-1]
+
+
+def test_brain_cannot_be_talked_into_deleting(env, qapp):
+    a, ctl, store, spk = with_brain(env, '{"tool": "todo_remove", "args": {"text": "all"}}')
+    store.todo_add("keep me")
+    a.handle_text("destroy everything in my documents", src="key")
+    assert wait_for(qapp, lambda: ctl.mode == "answer")
+    assert [t["text"] for t in store.todo_list()] == ["keep me"]
+
+
+def test_write_request_types_the_draft_and_fails_closed(env, qapp, monkeypatch):
+    import app.core.assistant as mod
+    a, ctl, store, spk = with_brain(env, "Hi Maya, could we move the deadline to Friday?")
+    typed, clip = [], []
+    monkeypatch.setattr(mod.win, "type_text", lambda t: typed.append(t))
+    monkeypatch.setattr(mod.win, "set_clipboard", lambda t: clip.append(t))
+    a._target_hwnd = 111
+    monkeypatch.setattr(mod.win, "foreground_window", lambda: 111)
+    a.handle_text("write a short note asking Maya to move the deadline to friday", src="button")
+    assert wait_for(qapp, lambda: typed) and typed == ["Hi Maya, could we move the deadline to Friday?"]
+    a.brain.backend.replies.append("Second draft.")
+    monkeypatch.setattr(mod.win, "foreground_window", lambda: 999)      # user switched windows
+    a.handle_text("write another short note about nothing much", src="button")
+    assert wait_for(qapp, lambda: clip) and clip == ["Second draft."] and len(typed) == 1

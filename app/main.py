@@ -114,9 +114,16 @@ def main() -> int:
             except OSError as e:
                 print("[bridge]", e)
         from app.audio.recorder import Recorder
+        from app.llm.brain import Brain
+        from app.llm.server import LocalBackend
+        local = LocalBackend(lambda: settings["llm_model"])
+        app.aboutToQuit.connect(local.stop)
+        brain = Brain(local, ready=local.installed, name=settings["address"])
+        if local.installed():
+            threading.Thread(target=brain.warm, daemon=True).start()      # first question is then fast
         assistant = Assistant(ctl, settings, store, speaker, stt,
                               recorder_factory=(lambda lvl: Recorder(on_level=lvl)) if not args.no_voice else None,
-                              tracker=tracker)
+                              tracker=tracker, brain=brain, local_backend=local)
         if not args.no_keys and not args.no_voice:
             from app.winio.hotkey import HoldKey
             pending = {}
@@ -201,6 +208,25 @@ def main() -> int:
             tray.showMessage(config.APP_NAME, "Claude Code disconnected." + (f" Backup: {b.name}" if b else ""))
             refresh_claude_items()
 
+        from app.llm import manager as llm_manager
+
+        def refresh_brain_items():
+            have = llm_manager.is_installed(assistant.cfg["llm_model"]) and bool(llm_manager.server_binary())
+            b_get.setVisible(not have)
+            b_rm.setVisible(have)
+
+        def get_brain():
+            assistant.install_brain(assistant.cfg["llm_model"], on_done=lambda: assistant.ui(refresh_brain_items))
+
+        def remove_brain():
+            local.stop()
+            llm_manager.remove(assistant.cfg["llm_model"])
+            tray.showMessage(config.APP_NAME, "AI brain removed. Commands still work without it.")
+            refresh_brain_items()
+
+        b_get = act("Download AI brain (1.1 GB)", get_brain)
+        b_rm = act("Remove AI brain", remove_brain)
+        refresh_brain_items()
         c_on = act("Connect Claude Code...", connect_claude)
         c_off = act("Disconnect Claude Code", disconnect_claude)
 
@@ -235,7 +261,7 @@ def main() -> int:
             mics = [n for _, n in list_input_devices()][:1] or ["Default microphone"]
         except Exception:
             mics = ["Default microphone"]
-        ob = Onboarding(settings, speaker, installer, mics)
+        ob = Onboarding(settings, speaker, installer, mics, brain=assistant)
         eng = QQmlApplicationEngine()
         eng.warnings.connect(lambda ws: [print("QML:", w.toString(), file=sys.stderr) for w in ws])
         eng.rootContext().setContextProperty("ob", ob)

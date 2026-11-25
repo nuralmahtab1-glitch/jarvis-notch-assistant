@@ -92,6 +92,10 @@ def parse(text: str, now: datetime | None = None) -> Intent | None:
     if re.search(r"what('?s| is) (the )?(date|day)( today)?|what day is it|today'?s date", t):
         return Intent("date")
 
+    m = re.match(r"^(?:write|draft|compose|type out)\s+(.{6,})", t)
+    if m and not re.match(r"^(down|it down)\b", m.group(1)):
+        return Intent("write_text", {"instruction": m.group(1).strip()})
+
     # Claude Code
     if re.search(r"(what('?s| is) claude doing|claude status|how('?s| is) claude)", t):
         return Intent("claude_status")

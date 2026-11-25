@@ -38,7 +38,7 @@ Window {
     readonly property string mode: notch.mode
     readonly property bool isTiny: mode === "idle" || mode === "sleeping" || mode === "peek"
     readonly property bool isPanel: mode === "expanded" || mode === "music" || mode === "focus" || mode === "todo"
-    readonly property bool isCard: mode === "confirm" || mode === "claudeNeeds" || mode === "reminder" || mode === "claudeDone"
+    readonly property bool isCard: mode === "confirm" || mode === "claudeNeeds" || mode === "reminder" || mode === "claudeDone" || mode === "answer"
     readonly property bool isCompact: !isTiny && !isPanel && !isCard
     readonly property bool sleeping: mode === "sleeping"
 
@@ -251,7 +251,7 @@ Window {
                     font.family: th.font; font.pixelSize: 12 }
             }
             Row {
-                visible: win.mode === "claudeDone"
+                visible: win.mode === "claudeDone" || win.mode === "answer"
                 anchors.right: parent.right; anchors.rightMargin: th.flare + 18
                 anchors.verticalCenter: parent.verticalCenter
                 Pill { label: "Dismiss"; fg: "#000000"; bg: th.good; onClicked: notch.act("dismiss") }

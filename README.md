@@ -58,6 +58,26 @@ file up first, keeps your own hooks, and tags its entries so **Disconnect** remo
 - Hooks call a tiny stdlib-only helper (`app/claude_bridge/hook.py`) that talks to a loopback-only, token-protected
   local server. If Jarvis is not running the helper exits silently and instantly.
 
+## The AI brain (local, optional)
+
+Tray menu **Download AI brain (1.1 GB)** (or pick it in the setup tour) installs `llama.cpp` and **Qwen3 1.7B**
+into `models/`. Everything runs on your PC. Without it, everything still works through the rules parser; with it,
+Jarvis also understands unusual phrasing, answers short questions, and can **write for you**
+("write a short note asking Maya to move the deadline" types a draft into the focused app).
+
+How it behaves:
+- The rules parser always goes first (instant). The model only handles what the rules miss.
+- The model can only pick from a fixed list of tools; its output is validated, numbers are clamped, and unknown
+  tools are rejected.
+- **Safety nets that do not depend on the model:** destructive wording ("delete", "wipe", "get rid of"...) never
+  becomes an action; questions about your own data (list, battery, Claude, time) are answered by a real tool,
+  never invented; a tool must be justified by your words (so "lower the glare" can't toggle mute).
+- On this PC (i5-class CPU, 7.8 GB RAM, no usable GPU): about 10 s once at launch to warm up, then roughly 1 to
+  3 s per request. The model is unloaded after 10 idle minutes to free memory.
+- Measured with the real model: 21/22 on a development set and 14 to 15 of 16 on phrasings it had never seen.
+  A 1.7B model is small, so expect occasional misses; it fails safe (asks you to repeat) rather than guessing.
+- The model server writes `%APPDATA%\Jarvis\llama.log`. If it dies mid-request the app restarts it and retries once.
+
 ## What is built, and what is not (honest status)
 
 **Built and tested:** the notch (shape, eyes, sleep/wake, hover tooltips, all states), hold-to-talk + wake word,
@@ -67,8 +87,7 @@ rules-based commands, to-do list, reminders, focus timer, Claude Code bridge + a
 now-playing + synced lyrics, tray menu, 17-step onboarding.
 
 **Not built yet:**
-- The local **LLM brain** (Qwen etc.). Commands use a rules parser, so unusual phrasing is not understood. The
-  onboarding model list is marked "Coming soon".
+- A full **Models page** for cloud providers / API keys (the local brain below is built).
 - **Models page** (add local/cloud models, API keys), **Settings window** (settings live in
   `%APPDATA%\Jarvis\settings.json`).
 - **Controls / Shelf / Apps** panels, world clocks, weather, teleprompter. Their tab icons show tooltips only.
@@ -80,7 +99,7 @@ now-playing + synced lyrics, tray menu, 17-step onboarding.
 ## Tests
 
 ```powershell
-.venv\Scripts\python.exe -m pytest tests -q     # 75 tests
+.venv\Scripts\python.exe -m pytest tests -q     # 107 tests
 ```
 
 Live checks (need a real screen/speakers): `tests/live_winio_check.py`, `tests/live_voice_roundtrip.py`,

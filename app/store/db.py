@@ -30,6 +30,7 @@ DEFAULT_SETTINGS = {
     "lyrics": True,
     "onboarded": False,
     "stt_model": "base.en",
+    "llm_model": "qwen3-1.7b",
     "websites": ["youtube.com", "github.com", "gmail.com"],
 }
 
@@ -86,6 +87,8 @@ class Store:
 
     def todo_complete_match(self, text: str) -> str | None:
         text = text.lower().strip()
+        if len(text) < 3:
+            return None
         for r in self.todo_list():
             if not r["done"] and (text in r["text"].lower() or r["text"].lower() in text):
                 self._q("UPDATE todos SET done=1 WHERE id=?", (r["id"],))
@@ -94,6 +97,8 @@ class Store:
 
     def todo_remove_match(self, text: str) -> str | None:
         text = text.lower().strip()
+        if len(text) < 3 or text in ("all", "everything", "the list", "my list"):
+            return None
         for r in self.todo_list():
             if text in r["text"].lower():
                 self._q("DELETE FROM todos WHERE id=?", (r["id"],))

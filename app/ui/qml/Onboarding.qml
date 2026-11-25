@@ -34,7 +34,7 @@ Window {
         { t: "Type with your voice", s: "Hold Right Alt and speak. Clean text lands in any app.", d: "dictate" },
         { t: "What should I call you?", s: "I will use it now and then in a short reply.", d: "name", kind: "name" },
         { t: "Yours alone", s: "Everything runs on this PC. Audio is deleted right after it is understood.", d: "name", kind: "privacy" },
-        { t: "Add a brain later", s: ob.hardware + " (" + ob.ramText + ")", d: "name", kind: "brain" },
+        { t: "Give " + ob.appName + " a brain", s: ob.hardware + " (" + ob.ramText + ")", d: "name", kind: "brain" },
         { t: "Watch Claude Code", s: "Optional. See what Claude is doing and approve actions from here.", d: "claude", kind: "claude" },
         { t: "Ready when you are", s: ob.appName + " is at the top of your screen. Try one of these.", d: "done", kind: "done" }
     ]
@@ -109,12 +109,16 @@ Window {
                 visible: win.cur.kind === "brain"; anchors.fill: parent
                 Column { x: 0; width: 330; spacing: 6
                     Repeater { model: ob.models
-                        delegate: Rectangle { required property var modelData; width: 330; height: 34; radius: 10; color: "#EDEDF2"
+                        delegate: Rectangle { required property var modelData; width: 330; height: 34; radius: 10
+                            color: ma.containsMouse && !modelData.tooBig ? "#E3E3EB" : "#EDEDF2"
                             Text { x: 12; anchors.verticalCenter: parent.verticalCenter; text: modelData.name + "  " + modelData.size
                                 color: "#17171C"; font.family: win.fontFam; font.pixelSize: 13; font.weight: Font.DemiBold }
                             Text { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter
-                                text: "Coming soon"; color: "#8A8A94"; font.family: win.fontFam; font.pixelSize: 12 } } }
-                    Rectangle { width: 330; height: 34; radius: 10; color: "#FFFFFF"; border.color: win.accent; border.width: 2
+                                text: modelData.status; font.family: win.fontFam; font.pixelSize: 12
+                                color: modelData.status.indexOf("Installed") === 0 ? "#1E9E5B" : (modelData.tooBig ? "#B3261E" : "#6B6B75") }
+                            MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; onClicked: ob.chooseModel(modelData.id) } } }
+                    Rectangle { width: 330; height: 34; radius: 10; color: "#FFFFFF"; border.width: 2
+                        border.color: ob.models.some(function(m) { return m.status.indexOf("Installed") === 0 }) ? "#E0E0E8" : win.accent
                         Text { x: 12; anchors.verticalCenter: parent.verticalCenter; text: "Not now (everything else works without one)"
                             color: "#17171C"; font.family: win.fontFam; font.pixelSize: 12; font.weight: Font.DemiBold } }
                 }
@@ -122,7 +126,7 @@ Window {
                     Text { text: "ANY PC"; color: "#8A8A94"; font.family: win.fontFam; font.pixelSize: 10; font.weight: Font.Bold }
                     Repeater { model: ["Voice commands", "Dictation in any app", "Music, timers, to-dos and the notch", "Claude Code approvals"]
                         delegate: Text { required property string modelData; text: "✓  " + modelData; color: "#17171C"; font.family: win.fontFam; font.pixelSize: 12 } }
-                    Text { topPadding: 6; text: "WITH A MODEL (LATER)"; color: "#8A8A94"; font.family: win.fontFam; font.pixelSize: 10; font.weight: Font.Bold }
+                    Text { topPadding: 6; text: "WITH A BRAIN"; color: "#8A8A94"; font.family: win.fontFam; font.pixelSize: 10; font.weight: Font.Bold }
                     Repeater { model: ["Answers to questions", "Write and rewrite", "Summaries", "Commands said any way you like"]
                         delegate: Text { required property string modelData; text: "•  " + modelData; color: "#6B6B75"; font.family: win.fontFam; font.pixelSize: 12 } }
                 }

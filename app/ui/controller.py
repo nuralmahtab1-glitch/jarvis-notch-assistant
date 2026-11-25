@@ -22,7 +22,7 @@ DEFAULT_TEXT = {
     "recording": ("Listening", ""), "done": ("Done", ""), "speaking": ("", ""),
     "confirm": ("Shall I go ahead?", ""), "volume": ("Volume", ""), "reminder": ("Reminder", ""),
     "claudeWorking": ("Claude is working", ""), "claudeNeeds": ("Claude is waiting for your OK", ""),
-    "claudeDone": ("Claude finished", ""), "claudeError": ("Claude hit a problem", ""),
+    "claudeDone": ("Claude finished", ""), "answer": ("", ""), "claudeError": ("Claude hit a problem", ""),
 }
 MODES = ["idle", "sleeping", "expanded", "listening", "hearing", "working", "done", "recording",
          "speaking", "confirm", "volume", "reminder", "music", "focus", "todo",
@@ -32,7 +32,7 @@ SIZES = {  # width, height
     "listening": (300, 44), "recording": (300, 44), "hearing": (400, 44), "working": (300, 44),
     "done": (250, 44), "speaking": (340, 44), "confirm": (450, 96), "volume": (300, 44),
     "reminder": (400, 76), "music": (560, 176), "focus": (560, 150), "todo": (560, 176),
-    "claudeWorking": (440, 44), "claudeNeeds": (500, 96), "claudeDone": (500, 76), "claudeError": (400, 44),
+    "claudeWorking": (440, 44), "claudeNeeds": (500, 96), "claudeDone": (500, 76), "claudeError": (400, 44), "answer": (520, 92),
 }
 DEMO_TEXT = {
     "hearing": ("Remind me to water the plants at six", ""), "speaking": ("Certainly.", ""),

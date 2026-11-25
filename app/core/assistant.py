@@ -1,7 +1,7 @@
 """Assistant: wires voice, tools, dictation, reminders, focus and Claude Code status to the notch.
 Made by Nur Al Mahtab."""
 from __future__ import annotations
-import threading, time
+import re, threading, time
 from datetime import datetime
 from typing import Callable
 
@@ -21,7 +21,8 @@ class Assistant(QObject):
     _ui = Signal(object)
 
     def __init__(self, ctl: NotchController, settings: Settings, store: Store,
-                 speaker=None, transcriber=None, recorder_factory=None, tracker: Tracker | None = None):
+                 speaker=None, transcriber=None, recorder_factory=None, tracker: Tracker | None = None,
+                 brain=None, local_backend=None):
         super().__init__()
         self.ctl, self.cfg, self.store = ctl, settings, store
         self.speaker, self.stt = speaker, transcriber
@@ -29,6 +30,8 @@ class Assistant(QObject):
         self.rec = None
         self.persona = Persona("butler", settings["address"])
         self.tracker = tracker
+        self.brain, self.local = brain, local_backend
+        self.brain_dl = {"id": None, "pct": 0, "state": ""}     # download status for the UI
         self.busy = False                 # a user interaction owns the notch
         self._capture_kind = None
         self._capture_src = "key"
@@ -217,14 +220,7 @@ class Assistant(QObject):
         if not cleaned:
             self.ctl.setMode("idle")
             return
-        if hwnd and win.foreground_window() != hwnd:      # fail closed: never type into a different window
-            win.set_clipboard(cleaned)
-            self.say("The window changed, so I copied it instead.", src="button", hold=3.5)
-            return
-        threading.Thread(target=lambda: win.type_text(cleaned), daemon=True).start()
-        self.ctl.setMode("done")
-        self.ctl.setText("Done", "")
-        QTimer.singleShot(1500, self._back_to_idle)
+        self.insert_text(cleaned, hwnd)        # fails closed: never types into a different window
 
     # ------------------------------------------------------------------ commands
     def handle_text(self, text: str, src: str = "key"):
@@ -237,7 +233,7 @@ class Assistant(QObject):
                 self.on_action("cancel"); return
         intent = parse(text)
         if not intent:
-            self.say(self.persona.say("unknown"), src)
+            self.ask_brain(text, src)
             return
         reply = self.run_intent(intent, src)
         if reply is not None:
@@ -246,6 +242,8 @@ class Assistant(QObject):
     def run_intent(self, it: Intent, src: str = "key") -> str | None:
         p, n, a = self.persona, self.persona.name, it.args
         try:
+            if it.name == "write_text":
+                return self.write_with_brain(a["instruction"], src)
             if it.name == "go_to_sleep":
                 self.say(p.say("sleep"), src)
                 QTimer.singleShot(2800, lambda: self.ctl.setMode("sleeping"))
@@ -349,6 +347,8 @@ class Assistant(QObject):
 
     def _every_second(self):
         now = time.time()
+        if self.local:
+            self.local.idle_stop(600)
         if self._focus_end:
             left = int(self._focus_end - now)
             self.ctl.setFocus(max(0, left), self._focus_total)
@@ -481,3 +481,114 @@ class Assistant(QObject):
                 self.ctl.wake()
                 self.show_card("music", seconds=6)
         self.ui(peek)
+
+    # ------------------------------------------------------------------ AI brain
+    def brain_available(self) -> bool:
+        return bool(self.brain and self.brain.ready())
+
+    def _need_brain(self, src: str):
+        self.say(f"I have not got my brain installed yet, {self.persona.name}. "
+                 "Choose Download AI brain from the tray menu.", src, hold=6)
+
+    def ask_brain(self, text: str, src: str = "key"):
+        """The rules parser did not understand: let the model decide (tool call or short answer)."""
+        if not self.brain or not self.brain.backend:
+            self.say(self.persona.say("unknown"), src)
+            return
+        if not self.brain.ready():
+            self._need_brain(src)
+            return
+        self.ctl.keepAwake(40)
+        self.ctl.setMode("working")
+        self.ctl.setText("Thinking", "")
+
+        def work():
+            d = self.brain.route(text)
+            self.ui(lambda: self._brain_result(d, src))
+        threading.Thread(target=work, daemon=True).start()
+
+    def _brain_result(self, d, src: str):
+        if d.intent:
+            reply = self.run_intent(d.intent, src)
+            if reply is not None:
+                self.say(reply, src)
+            elif self.ctl.mode == "working":
+                self.ctl.setMode("idle")
+        elif d.answer:
+            self.show_answer(d.answer, src)
+        else:
+            print("[brain]", d.error)
+            self.say(self.persona.say("unknown"), src)
+
+    def show_answer(self, text: str, src: str = "key"):
+        """A short answer: shown on a card (so you can read it) and spoken if the request was by voice."""
+        m = re.match(r"(.+?[.!?])\s+(.*)", text, flags=re.S)
+        title, sub = (m.group(1), m.group(2)) if m else (text, "")
+        self.ctl.keepAwake(20)
+        self.ctl.setMode("answer")
+        self.ctl.setText(title[:90], sub[:120])
+        if self.should_speak(src) and self.speaker and not self.cfg["dnd"]:
+            self.speaker.speak(text)
+        QTimer.singleShot(int(max(8, len(text) / 12) * 1000),
+                          lambda: self.ctl.mode == "answer" and self.ctl.setMode("idle"))
+
+    def write_with_brain(self, instruction: str, src: str) -> str | None:
+        if not self.brain_available():
+            self._need_brain(src)
+            return None
+        hwnd = self._target_hwnd or win.foreground_window()
+        self.ctl.keepAwake(60)
+        self.ctl.setMode("working")
+        self.ctl.setText("Writing it for you", "")
+
+        def work():
+            text = self.brain.write(instruction)
+            self.ui(lambda: self._type_draft(text, hwnd, src))
+        threading.Thread(target=work, daemon=True).start()
+        return None
+
+    def _type_draft(self, text: str | None, hwnd: int, src: str):
+        if not text:
+            self.say("I could not write that just now.", src)
+            return
+        self.insert_text(text, hwnd)
+
+    def install_brain(self, model_id: str, on_done=None):
+        """Download llama.cpp + the model in the background, with progress shown in the notch."""
+        from app.llm import manager
+        if self.brain_dl["state"] == "downloading":
+            return
+        self.brain_dl.update(id=model_id, pct=0, state="downloading")
+
+        def prog(done, total):
+            pct = int(100 * done / total) if total else 0
+            if pct != self.brain_dl["pct"]:
+                self.brain_dl["pct"] = pct
+                self.ui(lambda: (self.ctl.keepAwake(30), self.ctl.setMode("working") if not self.busy else None,
+                                 self.ctl.setText("Downloading my brain", f"{pct}%")))
+
+        def work():
+            try:
+                manager.install_runtime()
+                manager.install_model(model_id, prog)
+                self.cfg.set("llm_model", model_id)
+                self.brain_dl.update(state="done", pct=100)
+                self.ui(lambda: self.say(f"My brain is installed, {self.persona.name}. Ask me anything.", "key", hold=5))
+            except Exception as e:
+                print("[brain install]", e)
+                self.brain_dl.update(state="error")
+                self.ui(lambda: self.say("The download did not finish. You can try again from the tray menu.", "key", hold=5))
+            if on_done:
+                on_done()
+        threading.Thread(target=work, daemon=True).start()
+
+    def insert_text(self, text: str, hwnd: int | None = None):
+        """Type text into the target window, failing closed if the window changed."""
+        if hwnd and win.foreground_window() != hwnd:
+            win.set_clipboard(text)
+            self.say("The window changed, so I copied it instead.", src="button", hold=3.5)
+            return
+        threading.Thread(target=lambda: win.type_text(text), daemon=True).start()
+        self.ctl.setMode("done")
+        self.ctl.setText("Done", "")
+        QTimer.singleShot(1500, self._back_to_idle)
