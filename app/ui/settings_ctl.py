@@ -72,7 +72,7 @@ class SettingsController(QObject):
     def brainModels(self):
         from app.llm import manager
         return [{"id": m["id"], "name": f"{m['name']} ({m['size_gb']} GB)", "installed": manager.is_installed(m["id"])}
-                for m in manager.CATALOG]
+                for m in manager.all_models()]
 
     @Property(bool, notify=changed)
     def claudeConnected(self) -> bool:
@@ -143,7 +143,7 @@ class SettingsController(QObject):
                 return v if v in STT_CHOICES else None
             if key == "llm_model":
                 from app.llm import manager
-                return v if any(m["id"] == v for m in manager.CATALOG) else None
+                return v if any(m["id"] == v for m in manager.all_models()) else None
             if key == "mic_device":
                 return str(v) if str(v) in self._mics else None
             if key == "websites":
@@ -279,6 +279,20 @@ class SettingsController(QObject):
         from app.claude_bridge.web import new_pair_code
         self.cfg.set("web_pair_code", new_pair_code())
         self._say("New pairing code created. Paste it into the extension again.")
+
+    @Slot(str)
+    def importModel(self, path: str):
+        """Add a .gguf model you already have. It is copied into Jarvis's own folder and selected."""
+        from app.llm import manager
+        try:
+            rec = manager.import_gguf(path)
+        except (ValueError, OSError) as e:
+            self._say(str(e) if isinstance(e, ValueError) else "Could not copy that file.")
+            return
+        self.cfg.set("llm_model", rec["id"])
+        if self.a.local:
+            self.a.local.stop()
+        self._say(f"Imported {rec['name']} and selected it.")
 
     @Slot()
     def openPowerSettings(self):

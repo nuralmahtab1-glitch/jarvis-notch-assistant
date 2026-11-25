@@ -80,6 +80,12 @@ file up first, keeps your own hooks, and tags its entries so **Disconnect** remo
 - Hooks call a tiny stdlib-only helper (`app/claude_bridge/hook.py`) that talks to a loopback-only, token-protected
   local server. If Jarvis is not running the helper exits silently and instantly.
 
+## Your own models
+
+Settings -> AI brain -> **Add your own model**: paste the path of a `.gguf` file you already have (up to 8). It is
+checked, copied into Jarvis's own models folder and selected. Remove deletes the copy, never your original.
+Not built: pulling models by name from Ollama, and cloud providers with API keys.
+
 ## Claude Code on the web (browser extension)
 
 Jarvis can show what Claude Code is doing on claude.ai/code. Load the `extension` folder in Chrome or Edge

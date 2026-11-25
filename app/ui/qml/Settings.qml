@@ -155,6 +155,12 @@ Window {
                     SRow { title: "Model"; desc: "Qwen3 1.7B is quick. The 4B model is smarter but slow on this PC."
                         Seg { options: sc.brainModels.map(function(m) { return m.id }); labels: sc.brainModels.map(function(m) { return m.name })
                             current: win.v.llm_model; onPicked: sc.set("llm_model", value) } }
+                    SRow { title: "Add your own model"; desc: "Paste the full path of a .gguf file you already have. It is copied into Jarvis's own folder (up to 8). Cloud models are not supported."
+                        Row { spacing: 10
+                            Rectangle { width: 220; height: 36; radius: 10; color: "#fff"; border.color: "#CFCFD8"; clip: true
+                                TextInput { id: ggufPath; anchors.fill: parent; anchors.margins: 9; font.family: win.fontFam; font.pixelSize: 13; color: win.ink; selectByMouse: true; clip: true }
+                                Text { visible: ggufPath.text === ""; anchors.verticalCenter: parent.verticalCenter; x: 9; text: "C:\models\my-model.gguf"; font.family: win.fontFam; font.pixelSize: 13; color: "#9A9AA5" } }
+                            Btn { label: "Import"; kind: "primary"; enabled: ggufPath.text.trim() !== ""; onClicked: { sc.importModel(ggufPath.text); ggufPath.text = "" } } } }
                     SRow { title: "Download or remove"; desc: "Downloads once. The model unloads after ten idle minutes to free memory."
                         Row { spacing: 10
                             Btn { label: sc.brainStatus === "Installed" ? "Re-download" : "Download"; kind: "primary"
