@@ -34,6 +34,9 @@ def main() -> int:
     ap.add_argument("--demo", action="store_true", help="cycle through every notch state")
     ap.add_argument("--state", help="start in a given state")
     ap.add_argument("--shots", help="write a PNG of every state into this folder, then quit")
+    ap.add_argument("--say", help="pretend you said this (no microphone), then keep running")
+    ap.add_argument("--no-voice", action="store_true", help="do not load speech models or speak")
+    ap.add_argument("--no-keys", action="store_true", help="do not install the push-to-talk keyboard hook")
     args = ap.parse_args()
 
     app = QApplication(sys.argv)
@@ -47,7 +50,7 @@ def main() -> int:
         if not lock.tryLock(100):
             return 0  # already running
 
-    ctl = NotchController()
+    ctl = NotchController(demo_text=bool(args.demo or args.shots))
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("notch", ctl)
     engine.warnings.connect(lambda ws: [print("QML:", w.toString(), file=sys.stderr) for w in ws])
@@ -80,6 +83,58 @@ def main() -> int:
             shrink.start()
     ctl.changed.connect(on_change)
     apply_mask(False)
+
+    # --- assistant (voice, tools, Claude Code bridge) ---
+    assistant = None
+    if not args.shots and not args.demo:
+        import threading
+        from app.store.db import Settings, Store
+        from app.core.assistant import Assistant
+        from app.claude_bridge.tracker import Bridge, Tracker
+        settings, store = Settings(), Store()
+        ctl._sleep_after = settings["sleep_after_minutes"] * 60 if not os.environ.get("JARVIS_SLEEP_SECONDS") else ctl._sleep_after
+        speaker = stt = None
+        if not args.no_voice:
+            from app.tts.engine import Speaker
+            from app.stt.whisper_stt import Transcriber
+            speaker = Speaker(speed=settings["voice_speed"])
+            stt = Transcriber(settings["stt_model"])
+            threading.Thread(target=stt.load, daemon=True).start()      # warm the model in the background
+        tracker = bridge = None
+        if settings["claude_bridge"]:
+            tracker = Tracker(approval_timeout=settings["claude_approval_timeout"],
+                              hide_details=settings["claude_hide_details"],
+                              quiet_when_focused=settings["claude_quiet_when_focused"])
+            try:
+                bridge = Bridge(tracker); bridge.start()
+                app.aboutToQuit.connect(bridge.stop)
+            except OSError as e:
+                print("[bridge]", e)
+        from app.audio.recorder import Recorder
+        assistant = Assistant(ctl, settings, store, speaker, stt,
+                              recorder_factory=(lambda lvl: Recorder(on_level=lvl)) if not args.no_voice else None,
+                              tracker=tracker)
+        if not args.no_keys and not args.no_voice:
+            from app.winio.hotkey import HoldKey
+            pending = {}
+
+            def make(kind):
+                def down():
+                    t = threading.Timer(0.25, lambda: assistant.begin_capture(kind, "key"))
+                    pending[kind] = t; t.start()
+                def up():
+                    t = pending.pop(kind, None)
+                    if t and t.is_alive():
+                        t.cancel()              # a quick tap (e.g. Ctrl+C): ignore
+                    else:
+                        assistant.end_capture()
+                return down, up
+            keys = HoldKey({settings["ptt_command_key"]: make("command"), settings["ptt_dictate_key"]: make("dictate")})
+            keys.start()
+            app.aboutToQuit.connect(keys.stop)
+        if args.say:
+            QTimer.singleShot(800, lambda: assistant.handle_text(args.say, "key"))
+        app.assistant = assistant      # keep alive
 
     # --- tray ---
     tray = QSystemTrayIcon(tray_icon(), app)

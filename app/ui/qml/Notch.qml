@@ -38,7 +38,7 @@ Window {
     readonly property string mode: notch.mode
     readonly property bool isTiny: mode === "idle" || mode === "sleeping" || mode === "peek"
     readonly property bool isPanel: mode === "expanded" || mode === "music" || mode === "focus" || mode === "todo"
-    readonly property bool isCard: mode === "confirm" || mode === "claudeNeeds" || mode === "reminder"
+    readonly property bool isCard: mode === "confirm" || mode === "claudeNeeds" || mode === "reminder" || mode === "claudeDone"
     readonly property bool isCompact: !isTiny && !isPanel && !isCard
     readonly property bool sleeping: mode === "sleeping"
 
@@ -222,9 +222,9 @@ Window {
             Behavior on opacity { NumberAnimation { duration: 180 } }
             Eyes {
                 x: th.flare + 18; y: 18
-                mood: win.mode === "claudeNeeds" || win.mode === "confirm" ? "alert" : "normal"
+                mood: win.mode === "claudeNeeds" || win.mode === "confirm" ? "alert" : (win.mode === "claudeDone" ? "happy" : "normal")
                 lookX: 0; lookY: 0
-                tint: win.mode === "claudeNeeds" ? th.warn : "#FFFFFF"
+                tint: win.mode === "claudeNeeds" ? th.warn : (win.mode === "claudeDone" ? th.good : "#FFFFFF")
             }
             Column {
                 x: th.flare + 18 + 60; y: 14
@@ -236,20 +236,26 @@ Window {
                     font.family: th.font; font.pixelSize: 12 }
             }
             Row {
-                visible: win.mode !== "reminder"
+                visible: win.mode === "claudeDone"
+                anchors.right: parent.right; anchors.rightMargin: th.flare + 18
+                anchors.verticalCenter: parent.verticalCenter
+                Pill { label: "Dismiss"; fg: "#000000"; bg: th.good; onClicked: notch.act("dismiss") }
+            }
+            Row {
+                visible: win.mode === "confirm" || win.mode === "claudeNeeds"
                 anchors.right: parent.right; anchors.rightMargin: th.flare + 18
                 anchors.bottom: parent.bottom; anchors.bottomMargin: 12
                 spacing: 8
-                Pill { label: win.mode === "claudeNeeds" ? "Deny" : "Not now"; fg: th.text1; bg: "#24242A"; onClicked: notch.setMode("idle") }
-                Pill { label: win.mode === "claudeNeeds" ? "Approve" : "Confirm"; fg: "#000000"; bg: win.mode === "claudeNeeds" ? th.warn : "#FFFFFF"; onClicked: notch.setMode("done") }
+                Pill { label: win.mode === "claudeNeeds" ? "Deny" : "Not now"; fg: th.text1; bg: "#24242A"; onClicked: notch.act(win.mode === "claudeNeeds" ? "deny" : "cancel") }
+                Pill { label: win.mode === "claudeNeeds" ? "Approve" : "Confirm"; fg: "#000000"; bg: win.mode === "claudeNeeds" ? th.warn : "#FFFFFF"; onClicked: notch.act(win.mode === "claudeNeeds" ? "approve" : "confirm") }
             }
             Row {
                 visible: win.mode === "reminder"
                 anchors.right: parent.right; anchors.rightMargin: th.flare + 18
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
-                Pill { label: "Snooze"; fg: th.text1; bg: "#24242A"; onClicked: notch.setMode("idle") }
-                Pill { label: "Log it"; fg: "#000000"; bg: th.accent; onClicked: notch.setMode("done") }
+                Pill { label: "Snooze"; fg: th.text1; bg: "#24242A"; onClicked: notch.act("snooze") }
+                Pill { label: "Dismiss"; fg: "#000000"; bg: th.accent; onClicked: notch.act("dismiss") }
             }
         }
 
@@ -265,9 +271,9 @@ Window {
             Row {
                 x: th.flare + 18; y: 12; spacing: 8
                 visible: win.mode === "expanded"
-                RoundBtn { glyph: "pointer"; key: "command" }
-                RoundBtn { glyph: ""; key: "dictate"; onClicked: notch.setMode("recording") }
-                RoundBtn { glyph: ""; key: "write" }
+                RoundBtn { glyph: "pointer"; key: "command"; onClicked: notch.act("btn_command") }
+                RoundBtn { glyph: ""; key: "dictate"; onClicked: notch.act("btn_dictate") }
+                RoundBtn { glyph: ""; key: "write"; onClicked: notch.act("btn_write") }
             }
             // top row: clock + tabs
             Row {
@@ -381,8 +387,8 @@ Window {
                 Row {
                     anchors.right: parent.right; anchors.rightMargin: th.flare + 20
                     y: 60; spacing: 8
-                    Pill { label: "Break"; fg: th.text1; bg: "#24242A"; onClicked: notch.setMode("idle") }
-                    Pill { label: "Stop"; fg: "#FFFFFF"; bg: "#B3261E"; onClicked: notch.setMode("idle") }
+                    Pill { label: "Break"; fg: th.text1; bg: "#24242A"; onClicked: notch.act("focus_break") }
+                    Pill { label: "Stop"; fg: "#FFFFFF"; bg: "#B3261E"; onClicked: notch.act("focus_stop") }
                 }
             }
 
@@ -393,24 +399,24 @@ Window {
                     gradient: Gradient { GradientStop { position: 0; color: "#FFB347" } GradientStop { position: 1; color: "#E5484D" } } }
                 Column {
                     x: th.flare + 20 + 78; y: 26; spacing: 2
-                    Text { text: "Golden Hour"; color: th.text1; font.family: th.font; font.pixelSize: 15; font.weight: Font.DemiBold }
-                    Text { text: "The Quiet Hours"; color: "#D9A79F"; font.family: th.font; font.pixelSize: 12 }
+                    Text { text: notch.music.title; color: th.text1; font.family: th.font; font.pixelSize: 15; font.weight: Font.DemiBold }
+                    Text { text: notch.music.artist; color: "#D9A79F"; font.family: th.font; font.pixelSize: 12 }
                 }
                 Item { x: th.flare + 20; y: 104; width: 270; height: 12
                     Rectangle { y: 4; width: parent.width; height: 4; radius: 2; color: "#4A2A25"
-                        Rectangle { width: parent.width * 0.32; height: 4; radius: 2; color: "#FF8A6B" } }
+                        Rectangle { width: parent.width * notch.music.frac; height: 4; radius: 2; color: "#FF8A6B" } }
                     Text { y: -1; text: "1:05"; x: 0; visible: false }
                 }
                 Row { x: th.flare + 20 + 70; y: 128; spacing: 26
-                    Text { text: ""; font.family: th.icons; font.pixelSize: 16; color: th.text1 }
-                    Text { text: ""; font.family: th.icons; font.pixelSize: 20; color: th.text1 }
-                    Text { text: ""; font.family: th.icons; font.pixelSize: 16; color: th.text1 }
+                    Text { text: ""; font.family: th.icons; font.pixelSize: 16; color: th.text1; MouseArea { anchors.fill: parent; anchors.margins: -8; onClicked: notch.act("media_prev") } }
+                    Text { text: ""; font.family: th.icons; font.pixelSize: 20; color: th.text1; MouseArea { anchors.fill: parent; anchors.margins: -8; onClicked: notch.act("media_play") } }
+                    Text { text: ""; font.family: th.icons; font.pixelSize: 16; color: th.text1; MouseArea { anchors.fill: parent; anchors.margins: -8; onClicked: notch.act("media_next") } }
                 }
                 Column {
                     x: 330; y: 34; spacing: 8; width: 190
-                    Text { text: "The light comes in low"; color: "#8A5A53"; font.family: th.font; font.pixelSize: 13 }
-                    Text { text: "And everything slows"; color: "#FFFFFF"; font.family: th.font; font.pixelSize: 15; font.weight: Font.DemiBold }
-                    Text { text: "We follow it home"; color: "#8A5A53"; font.family: th.font; font.pixelSize: 13 }
+                    Text { text: notch.music.lyrics[0] || ""; color: "#8A5A53"; font.family: th.font; font.pixelSize: 13 }
+                    Text { text: notch.music.lyrics[1] || ""; color: "#FFFFFF"; font.family: th.font; font.pixelSize: 15; font.weight: Font.DemiBold }
+                    Text { text: notch.music.lyrics[2] || ""; color: "#8A5A53"; font.family: th.font; font.pixelSize: 13 }
                 }
             }
         }
@@ -462,14 +468,17 @@ Window {
     component Bars: Item {
         id: bars
         property color barColor: "#FFFFFF"
+        readonly property bool live: notch.level >= 0
         width: 27; height: 18
         Repeater { model: 5
             delegate: Rectangle { required property int index
                 x: index * 6; width: 3; radius: 1.5; color: bars.barColor
                 property real hh: 5
-                height: hh
-                y: (bars.height - hh) / 2
-                SequentialAnimation on hh { loops: Animation.Infinite; running: bars.visible
+                readonly property real target: 4 + notch.level * (8 + (index * 5) % 9) * 1.4
+                height: bars.live ? Math.min(18, target) : hh
+                Behavior on height { enabled: bars.live; NumberAnimation { duration: 70 } }
+                y: (bars.height - height) / 2
+                SequentialAnimation on hh { loops: Animation.Infinite; running: bars.visible && !bars.live
                     NumberAnimation { to: 6 + ((index * 7) % 5) * 3; duration: 260 + index * 70; easing.type: Easing.InOutSine }
                     NumberAnimation { to: 4; duration: 260 + index * 55; easing.type: Easing.InOutSine } }
             } }

@@ -201,3 +201,35 @@ def battery() -> tuple[int | None, bool]:
     import psutil
     b = psutil.sensors_battery()
     return (round(b.percent), bool(b.power_plugged)) if b else (None, False)
+
+
+# ---------------- brightness (laptop panel via WMI) ----------------
+def _ps(cmd: str, timeout: int = 15) -> str:
+    r = subprocess.run(["powershell", "-NoProfile", "-Command", cmd], capture_output=True, text=True,
+                       timeout=timeout, creationflags=0x08000000)
+    return r.stdout.strip()
+
+
+def get_brightness() -> int | None:
+    out = _ps("(Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightness).CurrentBrightness")
+    return int(out.splitlines()[0]) if out else None
+
+
+def set_brightness(level: int) -> bool:
+    level = max(0, min(100, int(level)))
+    _ps(f"(Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightnessMethods)"
+        f" | Invoke-CimMethod -MethodName WmiSetBrightness -Arguments @{{Timeout=1; Brightness={level}}}")
+    return True
+
+
+def set_clipboard(text: str) -> None:
+    subprocess.run(["powershell", "-NoProfile", "-Command", "Set-Clipboard -Value $input"],
+                   input=text, text=True, timeout=5, creationflags=0x08000000)
+
+
+def chime() -> None:
+    try:
+        import winsound
+        winsound.MessageBeep(winsound.MB_ICONASTERISK)
+    except Exception:
+        pass

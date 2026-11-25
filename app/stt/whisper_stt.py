@@ -12,6 +12,7 @@ class Transcriber:
         self.model_size = model_size
         self._model = None
         self._lock = threading.Lock()
+        self._tlock = threading.Lock()   # one transcription at a time
 
     @property
     def loaded(self) -> bool:
@@ -30,8 +31,9 @@ class Transcriber:
         if audio.size < 1600:  # < 0.1 s
             return ""
         model = self.load()
-        segments, _ = model.transcribe(
-            audio, language="en", beam_size=1, vad_filter=True,
-            vad_parameters={"min_silence_duration_ms": 400},
-            condition_on_previous_text=False, initial_prompt=prompt or None)
-        return " ".join(s.text.strip() for s in segments).strip()
+        with self._tlock:
+          segments, _ = model.transcribe(
+              audio, language="en", beam_size=1, vad_filter=True,
+              vad_parameters={"min_silence_duration_ms": 400},
+              condition_on_previous_text=False, initial_prompt=prompt or None)
+          return " ".join(s.text.strip() for s in segments).strip()
