@@ -177,6 +177,10 @@ Window {
                             Btn { label: "Save"; kind: "primary"; enabled: apiKey.text.trim() !== ""; onClicked: { sc.saveApiKey(apiKey.text); apiKey.text = "" } }
                             Btn { label: "Test"; onClicked: sc.testCloud() }
                             Btn { label: "Remove"; kind: "danger"; enabled: sc.cloudHasKey; onClicked: sc.removeApiKey() } } }
+                    SRow { visible: win.v.llm_provider !== "local" && sc.cloudResult !== ""; title: "Test result"
+                        desc: sc.cloudResult
+                        Text { text: sc.cloudResult.indexOf("Connected") === 0 ? "OK" : (sc.cloudResult.indexOf("Testing") === 0 ? "..." : "Problem"); font.family: win.fontFam; font.pixelSize: 14; font.weight: Font.DemiBold
+                            color: sc.cloudResult.indexOf("Connected") === 0 ? "#1E9E5B" : (sc.cloudResult.indexOf("Testing") === 0 ? win.ink : "#B3261E") } }
                     SRow { visible: win.v.llm_provider === "local"; title: "Model"; desc: "Qwen3 1.7B is quick. The 4B model is smarter but slow on this PC."
                         Seg { options: sc.brainModels.map(function(m) { return m.id }); labels: sc.brainModels.map(function(m) { return m.name })
                             current: win.v.llm_model; onPicked: sc.set("llm_model", value) } }

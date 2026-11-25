@@ -259,3 +259,24 @@ def test_a_spoken_question_goes_through_the_cloud_end_to_end(service, tmp_path):
     assert "volume" in (run("zxqv blorp volume thingy") or "").lower() or Fake.log      # the fake always routes to volume_set
     Fake.mode = "401"
     assert "could not reach the cloud brain" in run("what is the meaning of everything") and "refused the key" in said[0]
+
+
+def test_test_result_stays_on_screen_until_something_changes(sc, service, monkeypatch):
+    """The 'Test' outcome used to be a 5-second toast that was easy to miss: it is now a permanent line."""
+    import time
+    from PySide6.QtWidgets import QApplication
+    c, cfg, vault, _ = sc
+    c.set("llm_provider", "custom"); c.set("cloud_base", "https://api.example.com/v1"); c.set("cloud_model", "m")
+    c.testCloud(); assert "save an API key" in c.cloudResult                           # no key yet
+    c.saveApiKey("sk-test-abcdef123456"); assert c.cloudResult == ""
+    c.set("cloud_base", service)
+    def wait():
+        end = time.time() + 8
+        while ("Testing" in c.cloudResult or c.cloudResult == "") and time.time() < end:
+            QApplication.processEvents(); time.sleep(0.02)
+    c.a.ui = lambda f: f()
+    c.testCloud(); assert "Testing" in c.cloudResult; wait()
+    assert c.cloudResult == "Connected. The cloud brain works."
+    Fake.mode = "401"; c.testCloud(); wait()
+    assert c.cloudResult.startswith("Failed: ") and "refused the key" in c.cloudResult
+    c.set("llm_provider", "openai"); assert c.cloudResult == ""                        # switching provider clears it

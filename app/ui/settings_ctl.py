@@ -33,6 +33,7 @@ class SettingsController(QObject):
         self._mics = ["Default microphone"] + (mic_names or [])
         self._restart = False
         self._msg = ""
+        self._cloud_result = ""             # outcome of the last "Test" press; stays on screen until something changes
         self._poll = QTimer(self)
         self._poll.setInterval(800)
         self._poll.timeout.connect(self.changed.emit)   # live brain-download progress
@@ -190,6 +191,8 @@ class SettingsController(QObject):
             a.persona.preset = v
         elif key == "voice_speed" and a.speaker:
             a.speaker.speed = v
+        elif key == "llm_provider":
+            self._cloud_result = ""
         elif key == "stt_model":
             self.cfg.set("stt_chosen", True)         # you picked it yourself: never change it for you
         elif key == "autohide":
@@ -322,6 +325,10 @@ class SettingsController(QObject):
         return "Only your questions and the last few replies are sent, never your screen, files or clipboard. Simple commands stay on this PC."
 
     @Property(str, notify=changed)
+    def cloudResult(self) -> str:
+        return self._cloud_result
+
+    @Property(str, notify=changed)
     def cloudModelHint(self) -> str:
         from app.llm.cloud import PROVIDERS
         return PROVIDERS.get(self.cfg["llm_provider"], {}).get("model", "")
@@ -349,12 +356,14 @@ class SettingsController(QObject):
         if not valid_key(key):
             self._say("That does not look like an API key (no spaces, at least 8 characters).")
             return
-        self._say("Key saved securely in Windows." if credstore.save(p, key) else "Windows would not store the key.")
+        self._cloud_result = ""
+        self._say("Key saved securely in Windows. Now press Test." if credstore.save(p, key) else "Windows would not store the key.")
 
     @Slot()
     def removeApiKey(self):
         from app.winio import credstore
         credstore.delete(self.cfg["llm_provider"])
+        self._cloud_result = ""
         self._say("Key removed.")
 
     @Slot()
@@ -365,16 +374,24 @@ class SettingsController(QObject):
         from app.winio import credstore
         cb = CloudBackend(lambda: self.cfg["llm_provider"], lambda: self.cfg["cloud_model"], lambda: self.cfg["cloud_base"], credstore.load)
         if self.cfg["llm_provider"] == "local":
-            self._say("Pick a cloud service first.")
+            self._cloud_result = "Pick a cloud service first."
+            self._say(self._cloud_result)
             return
         if not cb.installed():
-            self._say("Save an API key first (and a web address if you chose Other).")
+            self._cloud_result = "Not tested: save an API key first (and a web address if you chose Other)."
+            self._say(self._cloud_result)
             return
-        self._say("Testing...")
+        self._cloud_result = "Testing... this can take a few seconds."
+        self._say(self._cloud_result)
 
         def work():
             err = cb.test()
-            self.a.ui(lambda: self._say("Connected. The cloud brain works." if not err else err))
+            msg = "Connected. The cloud brain works." if not err else "Failed: " + err
+
+            def done():
+                self._cloud_result = msg
+                self._say(msg)
+            self.a.ui(done)
         threading.Thread(target=work, daemon=True).start()
 
     @Slot()
