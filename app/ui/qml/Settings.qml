@@ -149,17 +149,36 @@ Window {
 
                 // ============ AI BRAIN ============
                 Column { visible: win.page === 3; width: parent.width; spacing: 0
-                    SRow { title: "Status"; desc: "Runs fully on this PC. Without it, commands still work; with it, " + sc.appName + " also answers questions and writes for you."
+                    SRow { title: "Status"; desc: win.v.llm_provider === "local" ? "Runs fully on this PC. Without it, commands still work; with it, " + sc.appName + " also answers questions and writes for you." : "Questions go to the cloud service you chose. Commands still run on this PC, and if the service cannot be reached the local brain answers (if installed)."
                         Text { text: sc.brainStatus; font.family: win.fontFam; font.pixelSize: 14; font.weight: Font.DemiBold
-                            color: sc.brainStatus === "Installed" ? "#1E9E5B" : win.ink } }
-                    SRow { title: "Model"; desc: "Qwen3 1.7B is quick. The 4B model is smarter but slow on this PC."
+                            color: (sc.brainStatus === "Installed" || sc.brainStatus === "Cloud ready") ? "#1E9E5B" : win.ink } }
+                    SRow { title: "Brain source"; desc: sc.cloudNote
+                        Seg { options: sc.providers.map(function(p) { return p.id }); labels: sc.providers.map(function(p) { return p.label })
+                            current: win.v.llm_provider; onPicked: sc.set("llm_provider", value) } }
+                    SRow { visible: win.v.llm_provider !== "local"; title: "Model name"; desc: sc.cloudModelHint !== "" ? "Leave empty to use " + sc.cloudModelHint + ". Names change over time." : "Required: the model name your service uses."
+                        Rectangle { width: 230; height: 36; radius: 10; color: "#fff"; border.color: "#CFCFD8"; clip: true
+                            TextInput { anchors.fill: parent; anchors.margins: 9; text: win.v.cloud_model; font.family: win.fontFam; font.pixelSize: 13; color: win.ink; selectByMouse: true; clip: true
+                                onEditingFinished: sc.set("cloud_model", text) } } }
+                    SRow { visible: win.v.llm_provider === "custom"; title: "Web address"; desc: "An OpenAI-compatible service, for example https://api.example.com/v1"
+                        Rectangle { width: 260; height: 36; radius: 10; color: "#fff"; border.color: "#CFCFD8"; clip: true
+                            TextInput { anchors.fill: parent; anchors.margins: 9; text: win.v.cloud_base; font.family: win.fontFam; font.pixelSize: 13; color: win.ink; selectByMouse: true; clip: true
+                                onEditingFinished: sc.set("cloud_base", text) } } }
+                    SRow { visible: win.v.llm_provider !== "local"; title: "API key"; desc: (sc.cloudHasKey ? "A key is saved in Windows. " : (sc.cloudKeysUrl !== "" ? "Get one at " + sc.cloudKeysUrl + ". " : "")) + "It is stored in Windows Credential Manager, never in a file."
+                        Row { spacing: 8
+                            Rectangle { width: 170; height: 36; radius: 10; color: "#fff"; border.color: "#CFCFD8"; clip: true
+                                TextInput { id: apiKey; anchors.fill: parent; anchors.margins: 9; echoMode: TextInput.Password; font.family: win.fontFam; font.pixelSize: 13; color: win.ink; selectByMouse: true; clip: true }
+                                Text { visible: apiKey.text === ""; anchors.verticalCenter: parent.verticalCenter; x: 9; text: sc.cloudHasKey ? "saved" : "paste key"; font.family: win.fontFam; font.pixelSize: 13; color: "#9A9AA5" } }
+                            Btn { label: "Save"; kind: "primary"; enabled: apiKey.text.trim() !== ""; onClicked: { sc.saveApiKey(apiKey.text); apiKey.text = "" } }
+                            Btn { label: "Test"; onClicked: sc.testCloud() }
+                            Btn { label: "Remove"; kind: "danger"; enabled: sc.cloudHasKey; onClicked: sc.removeApiKey() } } }
+                    SRow { visible: win.v.llm_provider === "local"; title: "Model"; desc: "Qwen3 1.7B is quick. The 4B model is smarter but slow on this PC."
                         Seg { options: sc.brainModels.map(function(m) { return m.id }); labels: sc.brainModels.map(function(m) { return m.name })
                             current: win.v.llm_model; onPicked: sc.set("llm_model", value) } }
-                    SRow { title: "Add your own model"; desc: "Paste the full path of a .gguf file you already have. It is copied into Jarvis's own folder (up to 8). Cloud models are not supported."
+                    SRow { title: "Add your own model"; desc: "Paste the full path of a .gguf file you already have. It is copied into Jarvis's own folder (up to 8)."
                         Row { spacing: 10
                             Rectangle { width: 220; height: 36; radius: 10; color: "#fff"; border.color: "#CFCFD8"; clip: true
                                 TextInput { id: ggufPath; anchors.fill: parent; anchors.margins: 9; font.family: win.fontFam; font.pixelSize: 13; color: win.ink; selectByMouse: true; clip: true }
-                                Text { visible: ggufPath.text === ""; anchors.verticalCenter: parent.verticalCenter; x: 9; text: "C:\models\my-model.gguf"; font.family: win.fontFam; font.pixelSize: 13; color: "#9A9AA5" } }
+                                Text { visible: ggufPath.text === ""; anchors.verticalCenter: parent.verticalCenter; x: 9; text: "D:/models/my-model.gguf"; font.family: win.fontFam; font.pixelSize: 13; color: "#9A9AA5" } }
                             Btn { label: "Import"; kind: "primary"; enabled: ggufPath.text.trim() !== ""; onClicked: { sc.importModel(ggufPath.text); ggufPath.text = "" } } } }
                     SRow { title: "Download or remove"; desc: "Downloads once. The model unloads after ten idle minutes to free memory."
                         Row { spacing: 10

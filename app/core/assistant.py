@@ -626,6 +626,9 @@ class Assistant(QObject):
         return bool(self.brain and self.brain.ready())
 
     def _need_brain(self, src: str):
+        if self.cfg["llm_provider"] != "local":
+            self.say(f"The cloud brain needs an API key, {self.persona.name}. Add one in Settings, AI brain.", src, hold=6)
+            return
         self.say(f"I have not got my brain installed yet, {self.persona.name}. "
                  "Choose Download AI brain from the tray menu.", src, hold=6)
 
@@ -659,7 +662,8 @@ class Assistant(QObject):
             self.show_answer(d.answer, src)
         else:
             print("[brain]", d.error)
-            self.say(self.persona.say("unknown"), src)
+            why = getattr(getattr(self.brain, "backend", None), "last_error", "")
+            self.say(f"I could not reach the cloud brain. {why}" if why else self.persona.say("unknown"), src)
 
     def show_answer(self, text: str, src: str = "key"):
         """A short answer: shown on a card (so you can read it) and spoken if the request was by voice."""

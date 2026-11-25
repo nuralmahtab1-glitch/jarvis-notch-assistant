@@ -36,8 +36,9 @@ Made by Nur Al Mahtab. Jarvis is a voice assistant that lives in a small pill at
 ## First-time setup
 
 1. **AI brain (optional, makes it answer questions and write):** Settings -> AI brain -> **Download**. It's about 1 GB, runs only on your PC, and everything else works without it.
-2. **Your own model:** Settings -> AI brain -> *Add your own model*: paste the path of a `.gguf` file and press Import.
-3. **Weather city, clocks, favourite sites:** Settings -> General.
+2. **A smarter cloud brain (optional):** Settings -> AI brain -> Brain source -> ChatGPT / Gemini / Claude. Paste an API key (billed by that company, separate from a chat subscription) and press Test. Your questions are then sent to them.
+3. **Your own model:** Settings -> AI brain -> *Add your own model*: paste the path of a `.gguf` file and press Import.
+4. **Weather city, clocks, favourite sites:** Settings -> General.
 
 ## Panels (tab icons)
 

@@ -36,6 +36,7 @@ DEFAULT_SETTINGS = {
     "onboarded": False,
     "stt_model": "tiny.en",
     "llm_model": "qwen3-1.7b",
+    "llm_provider": "local", "cloud_model": "", "cloud_base": "",
     "persona": "butler",
     "mic_device": "Default microphone",
     "last_greeting": "",

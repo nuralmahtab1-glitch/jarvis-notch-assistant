@@ -1,6 +1,6 @@
 """Settings controller: validates, saves and live-applies every setting. Made by Nur Al Mahtab."""
 from __future__ import annotations
-import json, os, time
+import json, os, re, time
 from pathlib import Path
 from PySide6.QtCore import QObject, Property, QTimer, Signal, Slot
 from app import config
@@ -60,6 +60,13 @@ class SettingsController(QObject):
     @Property(str, notify=changed)
     def brainStatus(self) -> str:
         from app.llm import manager
+        if self.cfg["llm_provider"] != "local":
+            from app.llm.cloud import CloudBackend
+            from app.winio import credstore
+            cb = CloudBackend(lambda: self.cfg["llm_provider"], lambda: self.cfg["cloud_model"], lambda: self.cfg["cloud_base"], credstore.load)
+            if cb.installed():
+                return "Cloud ready"
+            return "Needs a web address and key" if self.cfg["llm_provider"] == "custom" and not self.cfg["cloud_base"] else "Needs an API key"
         mid = self.cfg["llm_model"]
         dl = getattr(self.a, "brain_dl", {"id": None, "state": "", "pct": 0})
         if dl["id"] == mid and dl["state"] == "downloading":
@@ -141,6 +148,19 @@ class SettingsController(QObject):
                 return [f"{a}={b}" for a, b in good]
             if key == "stt_model":
                 return v if v in STT_CHOICES else None
+            if key == "llm_provider":
+                from app.llm.cloud import ORDER
+                return v if v in ORDER else None
+            if key == "cloud_model":
+                v = str(v).strip()
+                return v if re.fullmatch(r"[\w.:/@+-]{0,80}", v) else None
+            if key == "cloud_base":
+                from app.llm.cloud import valid_base
+                v = str(v).strip()
+                if v and not valid_base(v):
+                    self._say("The address must start with https:// (or http://localhost).")
+                    return None
+                return v
             if key == "llm_model":
                 from app.llm import manager
                 return v if any(m["id"] == v for m in manager.all_models()) else None
@@ -279,6 +299,74 @@ class SettingsController(QObject):
         from app.claude_bridge.web import new_pair_code
         self.cfg.set("web_pair_code", new_pair_code())
         self._say("New pairing code created. Paste it into the extension again.")
+
+    # ---------------- cloud brain (ChatGPT / Gemini / Claude / other) ----------------
+    @Property("QVariantList", constant=True)
+    def providers(self):
+        from app.llm.cloud import ORDER, PROVIDERS
+        return [{"id": p, "label": "This PC" if p == "local" else PROVIDERS[p]["label"]} for p in ORDER]
+
+    @Property(str, notify=changed)
+    def cloudNote(self) -> str:
+        if self.cfg["llm_provider"] == "local":
+            return "This PC is private and free but slower. A cloud service is much smarter, but your questions are sent to it."
+        return "Only your questions and the last few replies are sent, never your screen, files or clipboard. Simple commands stay on this PC."
+
+    @Property(str, notify=changed)
+    def cloudModelHint(self) -> str:
+        from app.llm.cloud import PROVIDERS
+        return PROVIDERS.get(self.cfg["llm_provider"], {}).get("model", "")
+
+    @Property(str, notify=changed)
+    def cloudKeysUrl(self) -> str:
+        from app.llm.cloud import PROVIDERS
+        return PROVIDERS.get(self.cfg["llm_provider"], {}).get("keys", "")
+
+    @Property(bool, notify=changed)
+    def cloudHasKey(self) -> bool:
+        from app.winio import credstore
+        p = self.cfg["llm_provider"]
+        return p != "local" and bool(credstore.load(p))
+
+    @Slot(str)
+    def saveApiKey(self, key: str):
+        """Store the key in the Windows Credential Manager for the chosen provider."""
+        from app.llm.cloud import valid_key
+        from app.winio import credstore
+        p = self.cfg["llm_provider"]
+        if p == "local":
+            return
+        key = key.strip()
+        if not valid_key(key):
+            self._say("That does not look like an API key (no spaces, at least 8 characters).")
+            return
+        self._say("Key saved securely in Windows." if credstore.save(p, key) else "Windows would not store the key.")
+
+    @Slot()
+    def removeApiKey(self):
+        from app.winio import credstore
+        credstore.delete(self.cfg["llm_provider"])
+        self._say("Key removed.")
+
+    @Slot()
+    def testCloud(self):
+        """Ask the service one tiny question in the background and report the result."""
+        import threading
+        from app.llm.cloud import CloudBackend
+        from app.winio import credstore
+        cb = CloudBackend(lambda: self.cfg["llm_provider"], lambda: self.cfg["cloud_model"], lambda: self.cfg["cloud_base"], credstore.load)
+        if self.cfg["llm_provider"] == "local":
+            self._say("Pick a cloud service first.")
+            return
+        if not cb.installed():
+            self._say("Save an API key first (and a web address if you chose Other).")
+            return
+        self._say("Testing...")
+
+        def work():
+            err = cb.test()
+            self.a.ui(lambda: self._say("Connected. The cloud brain works." if not err else err))
+        threading.Thread(target=work, daemon=True).start()
 
     @Slot(str)
     def importModel(self, path: str):

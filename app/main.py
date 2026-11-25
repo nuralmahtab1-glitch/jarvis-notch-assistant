@@ -179,9 +179,14 @@ def main() -> int:
         from app.llm.server import LocalBackend
         local = LocalBackend(lambda: settings["llm_model"])
         app.aboutToQuit.connect(local.stop)
-        brain = Brain(local, ready=local.installed, name=settings["address"])
-        if local.installed():
-            threading.Thread(target=brain.warm, daemon=True).start()      # first question is then fast
+        from app.llm.cloud import CloudBackend, RoutedBackend
+        from app.winio import credstore
+        cloud = CloudBackend(lambda: settings["llm_provider"], lambda: settings["cloud_model"], lambda: settings["cloud_base"],
+                             lambda p: credstore.load(p))
+        routed = RoutedBackend(local, cloud, lambda: settings["llm_provider"])
+        brain = Brain(routed, ready=routed.installed, name=settings["address"])
+        if settings["llm_provider"] == "local" and local.installed():
+            threading.Thread(target=brain.warm, daemon=True).start()      # first question is then fast (not needed for the cloud)
         assistant = Assistant(ctl, settings, store, speaker, stt,
                               recorder_factory=(lambda lvl: Recorder(on_level=lvl, device=device_index(settings["mic_device"]))) if not args.no_voice else None,
                               tracker=tracker, brain=brain, local_backend=local)

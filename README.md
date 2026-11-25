@@ -96,7 +96,21 @@ file up first, keeps your own hooks, and tags its entries so **Disconnect** remo
 
 Settings -> AI brain -> **Add your own model**: paste the path of a `.gguf` file you already have (up to 8). It is
 checked, copied into Jarvis's own models folder and selected. Remove deletes the copy, never your original.
-Not built: pulling models by name from Ollama, and cloud providers with API keys.
+Not built: pulling models by name from Ollama.
+
+## Cloud brain (ChatGPT, Gemini, Claude or another service)
+
+Settings -> AI brain -> **Brain source**. Pick ChatGPT, Gemini, Claude or Other (any OpenAI-compatible service, including
+one running on this PC), paste your **API key** and press Test. A cloud model is far smarter and faster than the small local one.
+
+- **You need an API key, which is billed separately from a ChatGPT/Gemini/Claude subscription** (Gemini has a limited free tier;
+  check its terms, free-tier prompts may be used to improve the service). Jarvis cannot log in with your account.
+- The key is stored in the **Windows Credential Manager**, never in a file. Web addresses must be https (or localhost).
+- Only your question, the last few turns and the fixed instructions are sent: never your screen, clipboard, shelf or to-do list.
+  Simple commands (timers, volume, opening apps...) are understood on this PC and never reach the cloud.
+- If the service cannot be reached and a local brain is installed, the local one answers instead.
+- Tested against a stand-in service on this PC, **not against the real OpenAI, Google or Anthropic servers** (no keys here).
+  Default model names (`gpt-4o-mini`, `gemini-2.5-flash`, `claude-haiku-5-5`) can be changed in Settings if a service renames them.
 
 ## Claude Code on the web (browser extension)
 
@@ -229,7 +243,6 @@ rules-based commands, to-do list, reminders, focus timer, Claude Code bridge + a
 now-playing + synced lyrics, tray menu, 17-step onboarding.
 
 **Not built yet:**
-- A full **Models page** for cloud providers / API keys (the local brain below is built).
 - Adding your own models by file or Ollama name (the Settings window lists the built-in Qwen3 models only).
 - Voice-paced teleprompter (it scrolls at a fixed speed you control).
 - Dragging an item **out of** the Shelf into another app uses Qt's native drag, which I could not exercise
