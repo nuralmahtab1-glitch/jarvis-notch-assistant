@@ -192,7 +192,7 @@ Window {
                 id: compactLabel
                 x: th.flare + 14 + 52
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - x - th.flare - 56
+                width: parent.width - x - th.flare - 56 - (win.mode === "claudeWorking" ? 54 : 0)    // leave room for the timer
                 text: notch.title
                 textFormat: Text.PlainText
                 color: win.mode === "hearing" ? th.text1 : th.text1

@@ -163,6 +163,8 @@ def main() -> int:
         if not args.no_voice:
             from app.tts.engine import Speaker
             from app.stt.whisper_stt import Transcriber
+            if settings["stt_model"] == "tiny.en" and not settings["stt_chosen"]:
+                settings.set("stt_model", "base.en")      # an earlier version defaulted to the smaller, less accurate model
             speaker = Speaker(speed=settings["voice_speed"])
             def _warm_voice():                    # load the voice now so the first reply is not slow
                 try:

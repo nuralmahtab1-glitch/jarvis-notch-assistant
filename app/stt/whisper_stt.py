@@ -36,9 +36,18 @@ class Transcriber:
                     pass
         return self._model
 
+    @staticmethod
+    def level_fix(audio: np.ndarray) -> np.ndarray:
+        """A quiet microphone is the most common reason for misheard words: bring the loudest part up to a healthy level."""
+        peak = float(np.abs(audio).max()) if audio.size else 0.0
+        if 0.003 < peak < 0.5:
+            return np.clip(audio * (0.7 / peak), -1.0, 1.0).astype(np.float32)
+        return audio
+
     def transcribe(self, audio: np.ndarray, prompt: str = "") -> str:
         if audio.size < 1600:  # < 0.1 s
             return ""
+        audio = self.level_fix(audio)
         model = self.load()
         with self._tlock:
           segments, _ = model.transcribe(

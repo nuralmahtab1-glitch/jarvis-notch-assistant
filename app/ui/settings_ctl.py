@@ -190,6 +190,8 @@ class SettingsController(QObject):
             a.persona.preset = v
         elif key == "voice_speed" and a.speaker:
             a.speaker.speed = v
+        elif key == "stt_model":
+            self.cfg.set("stt_chosen", True)         # you picked it yourself: never change it for you
         elif key == "autohide":
             self.ctl.autohide = bool(v)
             self.ctl.wake()

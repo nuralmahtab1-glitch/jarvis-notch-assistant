@@ -55,7 +55,7 @@ cd jarvis
 .venv\Scripts\python.exe run.py --say "what time is it"   # pretend you said something (no mic)
 ```
 
-First launch downloads nothing by itself: the speech model (`faster-whisper tiny.en` by default, ~75 MB; pick base.en or small.en in Settings for accuracy at the cost of speed) is fetched the
+First launch downloads nothing by itself: the speech model (`faster-whisper base.en` by default, ~150 MB (tiny.en is faster but mishears more; small.en is the most accurate and slowest). Commands get a vocabulary hint and a quiet mic is boosted, which cut mistakes by more than half in testing) is fetched the
 first time it is needed, and the British voice (Piper `en_GB-alan-medium`) lives in `models/piper/`.
 
 Tray icon menu: **Settings...**, About, Download/Remove AI brain, Connect/Disconnect Claude Code, Do not disturb, Speak replies, Start with Windows,

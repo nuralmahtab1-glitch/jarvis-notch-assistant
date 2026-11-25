@@ -211,10 +211,22 @@ class Assistant(QObject):
         self.ctl.setText("Writing it down" if kind == "dictate" else "Working on it", "")
         threading.Thread(target=self._process, args=(audio, kind, src, hwnd), daemon=True).start()
 
+    COMMAND_HINT = ("Jarvis, open YouTube and Chrome side by side. Open Spotify, Discord, Notepad, Google Chrome. Set a timer. "
+                    "Search for. Volume. Remind me to. Add to my to-do list. Snap this window to the left.")
+
+    def command_hint(self) -> str:
+        """Fixed vocabulary plus the names of your own favourite sites."""
+        try:
+            sites = [re.sub(r"^https?://(www\.)?", "", w).split("/")[0].split(".")[0] for w in self.cfg["websites"]]
+        except Exception:
+            sites = []
+        return (self.COMMAND_HINT + (" " + ", ".join(s for s in sites if s) + "." if sites else ""))[:400]
+
     def _process(self, audio, kind, src, hwnd):
         t0 = time.perf_counter()
         try:
-            text = self.stt.transcribe(audio) if self.stt else ""
+            # a hint about the kind of thing you say makes it hear names and commands much better (not used for dictation)
+            text = self.stt.transcribe(audio, "" if kind == "dictate" else self.command_hint()) if self.stt else ""
         except Exception as e:
             print("[stt]", e)
             text = ""
