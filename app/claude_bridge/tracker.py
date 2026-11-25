@@ -259,7 +259,7 @@ class Bridge:
     def start(self):
         p = config_path()
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(json.dumps({"port": self.port, "token": self.token}), encoding="utf-8")
+        p.write_text(json.dumps({"port": self.port, "token": self.token, "pid": os.getpid()}), encoding="utf-8")
         self._t.start()
 
     def stop(self):

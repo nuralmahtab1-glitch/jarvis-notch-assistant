@@ -4,3 +4,9 @@ __pycache__/
 shots/
 models/
 *.log
+dist/
+build/
+/jarvis-hook.spec
+/JarvisSetup.spec
+packaging/version_*.txt
+packaging/payload.zip

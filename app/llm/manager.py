@@ -4,7 +4,9 @@ import json, os, re, shutil, urllib.request, zipfile
 from pathlib import Path
 from typing import Callable
 
-ROOT = Path(__file__).resolve().parents[2] / "models"
+from app import paths
+
+ROOT = paths.user_models()
 LLM_DIR, RUNTIME_DIR = ROOT / "llm", ROOT / "llama"
 
 CATALOG = [

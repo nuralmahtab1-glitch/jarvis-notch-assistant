@@ -12,7 +12,9 @@ from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 from app import config
 from app.ui.controller import MODES, SIZES, NotchController
 
-QML = Path(__file__).parent / "ui" / "qml" / "Notch.qml"
+from app import paths
+
+QML = paths.qml("Notch.qml")
 
 
 def tray_icon() -> QIcon:
@@ -110,6 +112,7 @@ def main() -> int:
             speaker = Speaker(speed=settings["voice_speed"])
             stt = Transcriber(settings["stt_model"])
             threading.Thread(target=stt.load, daemon=True).start()      # warm the model in the background
+            first_download = not stt.cached()
         tracker = bridge = None
         if settings["claude_bridge"]:
             tracker = Tracker(approval_timeout=settings["claude_approval_timeout"],
@@ -178,6 +181,8 @@ def main() -> int:
         assistant.shelf = shelf_ctl
         if settings["onboarded"] and speaker and not args.say:
             QTimer.singleShot(3000, assistant.greet_if_due)      # once per day
+        if not args.no_voice and first_download:
+            QTimer.singleShot(4000, lambda: assistant.say("Getting my speech model ready. This takes a minute the first time.", src="button", hold=7))
         if args.say:
             QTimer.singleShot(800, lambda: assistant.handle_text(args.say, "key"))
         app.assistant = assistant      # keep alive
@@ -200,7 +205,7 @@ def main() -> int:
         eng = QQmlApplicationEngine()
         eng.warnings.connect(lambda ws: [print("QML:", w.toString(), file=sys.stderr) for w in ws])
         eng.rootContext().setContextProperty("sc", sc)
-        eng.load(QUrl.fromLocalFile(str(Path(__file__).parent / "ui" / "qml" / "Settings.qml")))
+        eng.load(QUrl.fromLocalFile(str(paths.qml("Settings.qml"))))
         if not eng.rootObjects():
             return
         w = eng.rootObjects()[0]
@@ -340,7 +345,7 @@ def main() -> int:
         eng = QQmlApplicationEngine()
         eng.warnings.connect(lambda ws: [print("QML:", w.toString(), file=sys.stderr) for w in ws])
         eng.rootContext().setContextProperty("ob", ob)
-        eng.load(QUrl.fromLocalFile(str(Path(__file__).parent / "ui" / "qml" / "Onboarding.qml")))
+        eng.load(QUrl.fromLocalFile(str(paths.qml("Onboarding.qml"))))
         if not eng.rootObjects():
             return
         w = eng.rootObjects()[0]

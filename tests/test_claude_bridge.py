@@ -192,3 +192,33 @@ def test_bridge_rejects_bad_token(bridge):
     c = http.client.HTTPConnection("127.0.0.1", b.port, timeout=3)
     c.request("POST", "/hook", body=b"{}")
     assert c.getresponse().status == 401
+
+
+def test_hook_ignores_a_stale_connection_file_instantly(tmp_path):
+    """If Jarvis was killed, bridge.json is left behind. The hook must not wait on a dead (or reused) port."""
+    import socket
+    proc = subprocess.Popen([sys.executable, "-c", "pass"]); proc.wait()          # a process id that is certainly dead
+    srv = socket.socket(); srv.bind(("127.0.0.1", 0)); srv.listen(1)               # a port that WOULD accept and never answer
+    (tmp_path / "Jarvis").mkdir()
+    (tmp_path / "Jarvis" / "bridge.json").write_text(json.dumps({"port": srv.getsockname()[1], "token": "t", "pid": proc.pid}))
+    t0 = time.time()
+    r = run_hook(ev("PermissionRequest", tool_name="Bash", tool_input={"command": "ls"}), tmp_path)
+    srv.close()
+    assert r.returncode == 0 and r.stdout == "" and time.time() - t0 < 3.0         # would have been 45 s without the pid check
+
+
+def test_hook_still_works_when_the_pid_is_alive(bridge, tmp_path):
+    t, b = bridge
+    cfg = json.loads(config_path().read_text())
+    assert cfg["pid"] == os.getpid()
+    r = run_hook(ev("UserPromptSubmit"), tmp_path)
+    assert r.returncode == 0 and t.urgent().state == "working"
+
+
+def test_disconnect_does_not_touch_a_file_that_has_no_jarvis_hooks(tmp_path):
+    p = tmp_path / "settings.json"
+    original = '{\n   "theme":   "dark",\n\t"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "echo mine"}]}]}\n}'
+    p.write_text(original)
+    assert installer.disconnect(p) is None
+    assert p.read_text() == original                                  # byte-for-byte, odd formatting and all
+    assert list(tmp_path.glob("*.jarvis-backup-*")) == []

@@ -4,7 +4,9 @@ import threading
 from pathlib import Path
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[2] / "models" / "whisper"
+from app import paths
+
+ROOT = paths.user_models() / "whisper"
 
 
 class Transcriber:
@@ -13,6 +15,10 @@ class Transcriber:
         self._model = None
         self._lock = threading.Lock()
         self._tlock = threading.Lock()   # one transcription at a time
+
+    def cached(self) -> bool:
+        """Is the speech model already on this PC? (If not, the first use downloads about 150 MB.)"""
+        return (ROOT / f"models--Systran--faster-whisper-{self.model_size}").exists()
 
     @property
     def loaded(self) -> bool:

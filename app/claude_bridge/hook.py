@@ -5,10 +5,25 @@ if Jarvis is not running it exits silently and instantly. For PermissionRequest 
 decision JSON Jarvis returns (or nothing, which hands back to Claude Code's normal prompt).
 Made by Nur Al Mahtab.
 """
+import ctypes
 import http.client
 import json
 import os
 import sys
+
+
+def process_alive(pid) -> bool:
+    """Is the Jarvis that wrote the connection file still running? (A stale file must never make us wait.)"""
+    try:
+        h = ctypes.windll.kernel32.OpenProcess(0x1000, False, int(pid))      # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return False
+        code = ctypes.c_ulong()
+        ok = ctypes.windll.kernel32.GetExitCodeProcess(h, ctypes.byref(code))
+        ctypes.windll.kernel32.CloseHandle(h)
+        return bool(ok) and code.value == 259                                  # STILL_ACTIVE
+    except Exception:
+        return True                                                              # cannot tell: try anyway
 
 
 def main() -> int:
@@ -16,6 +31,8 @@ def main() -> int:
         cfg_path = os.path.join(os.environ.get("APPDATA", ""), "Jarvis", "bridge.json")
         with open(cfg_path, "r", encoding="utf-8") as f:
             cfg = json.load(f)
+        if cfg.get("pid") and not process_alive(cfg["pid"]):
+            return 0                       # Jarvis is not running: exit instantly and silently
         raw = sys.stdin.read()
         event = {}
         try:
@@ -23,7 +40,10 @@ def main() -> int:
         except ValueError:
             pass
         wants_reply = event.get("hook_event_name") == "PermissionRequest"
-        conn = http.client.HTTPConnection("127.0.0.1", int(cfg["port"]), timeout=45 if wants_reply else 1.0)
+        conn = http.client.HTTPConnection("127.0.0.1", int(cfg["port"]), timeout=1.0)
+        conn.connect()                     # connecting must be quick...
+        if wants_reply:
+            conn.sock.settimeout(45)       # ...but a permission answer may take a while (you are deciding)
         conn.request("POST", "/hook", body=raw.encode("utf-8"),
                      headers={"Content-Type": "application/json", "X-Jarvis-Token": cfg["token"]})
         resp = conn.getresponse()

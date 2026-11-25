@@ -4,10 +4,14 @@ from pathlib import Path
 from app import config
 
 KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-ROOT = Path(__file__).resolve().parents[2]
+from app import paths
+
+ROOT = paths.project_root()
 
 
 def command() -> str:
+    if paths.FROZEN:
+        return f'"{sys.executable}"'
     pyw = Path(sys.executable).with_name("pythonw.exe")
     return f'"{pyw}" "{ROOT / "run.py"}"'
 

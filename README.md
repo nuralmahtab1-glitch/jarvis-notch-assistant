@@ -11,7 +11,29 @@ telemetry, no cloud.
 > "Jarvis" is a working name (one constant in `app/config.py`). It is also a trademarked character name, so
 > rename it before you ever publish or sell this.
 
-## Run it
+## Install it (Windows 10/11)
+
+Run **`dist\JarvisSetup.exe`** (about 325 MB, one file). It is a normal setup wizard: Welcome, Licence, folder and
+shortcut options, progress, Finish. It installs **for you only**, with **no administrator rights**, into
+`%LOCALAPPDATA%\Programs\Jarvis`. Silent install for scripts:
+`JarvisSetup.exe /S /D=C:\Some\Folder --no-launch` (also `--no-shortcuts`, `--desktop`, `--autostart`).
+
+- **Uninstall:** Settings > Apps > Installed apps > Jarvis. It stops Jarvis, removes its Claude Code hooks (only its
+  own), the start-with-Windows entry and the shortcuts, and asks whether to also delete your data and downloaded
+  models (default: keep). It never deletes a folder that isn't a Jarvis install, and the installer refuses to
+  install into a folder that already holds other files.
+- **First start:** the setup tour opens. The British voice is bundled; the speech model (about 150 MB) downloads the
+  first time, and the notch tells you. The optional AI brain is a separate download from the tray menu.
+- **If something goes wrong:** the installed app writes `%APPDATA%\Jarvis\jarvis.log` (trimmed automatically).
+- **Heads-up:** the installer is **not code-signed**, so Windows SmartScreen will say "unknown publisher" (click
+  More info > Run anyway), and some antivirus tools are suspicious of any new program that listens for a hotkey and
+  types text. Signing needs a paid certificate.
+
+Build it yourself: `python packaging/build.py` (about 10 minutes; needs the project's `.venv`). It makes
+`dist\Jarvis\` (the app) and `dist\JarvisSetup.exe`. Qt's unused parts (web engine, PDF, 3D, charts) are stripped out,
+which took the app from 879 MB to about 630 MB.
+
+## Run it from source
 
 ```powershell
 cd jarvis
@@ -130,14 +152,16 @@ now-playing + synced lyrics, tray menu, 17-step onboarding.
   automatically (dropping *in* is tested with synthesized events). Click to copy and the Paste button are tested.
 - A real on/off switch for **night light, battery saver and accessibility**: Windows gives apps no supported way to
   do that, so those tiles open the matching Windows Settings page instead.
-- **Browser extension** for claude.ai/code, and a Windows **installer**.
+- **Browser extension** for claude.ai/code. Code-signing the installer, and automatic updates.
+- Memory use: the running app takes about 600 MB with the speech model and wake word loaded (Qt itself is a few
+  hundred), which is above the original 150 MB target.
 - Not yet tested by a human with a real microphone and speakers: wake-word accuracy in a noisy room, dictation
   into every app, voice quality and loudness. Automated tests cover the logic, not your ears.
 
 ## Tests
 
 ```powershell
-.venv\Scripts\python.exe -m pytest tests -q     # 186 tests
+.venv\Scripts\python.exe -m pytest tests -q     # 200 tests
 ```
 
 Live checks (need a real screen/speakers): `tests/live_winio_check.py`, `tests/live_voice_roundtrip.py`,

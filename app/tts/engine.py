@@ -8,7 +8,14 @@ import io, queue, re, threading, wave
 from pathlib import Path
 from typing import Callable
 
-MODELS = Path(__file__).resolve().parents[2] / "models" / "piper"
+from app import paths
+
+# the voice ships inside the installer (read-only); a downloaded copy in the user folder also works
+MODEL_DIRS = [paths.user_models() / "piper", paths.bundled_models() / "piper"]
+
+
+def voice_file(name: str):
+    return next((d / f"{name}.onnx" for d in MODEL_DIRS if (d / f"{name}.onnx").exists()), None)
 
 
 def split_sentences(text: str) -> list[str]:
@@ -64,12 +71,12 @@ class PiperEngine:
         self._voice = None
 
     def available(self) -> bool:
-        return (MODELS / f"{self.voice_name}.onnx").exists()
+        return voice_file(self.voice_name) is not None
 
     def _load(self):
         if self._voice is None:
             from piper import PiperVoice
-            self._voice = PiperVoice.load(str(MODELS / f"{self.voice_name}.onnx"))
+            self._voice = PiperVoice.load(str(voice_file(self.voice_name)))
         return self._voice
 
     def synth_wav(self, text: str, speed: float = 1.0) -> bytes:

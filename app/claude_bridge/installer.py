@@ -22,6 +22,10 @@ def default_settings_path() -> Path:
 
 
 def _command(python: str | None = None) -> str:
+    """The command Claude Code runs for each hook. Installed app: the small jarvis-hook.exe in the hook folder next to Jarvis.exe."""
+    from app import paths
+    if paths.FROZEN and python is None:
+        return f'"{paths.install_dir() / "hook" / "jarvis-hook.exe"}" --{MARKER}'
     py = python or sys.executable
     return f'"{py}" "{HOOK_SCRIPT}" --{MARKER}'
 
@@ -106,8 +110,8 @@ def connect(path: Path | None = None, python: str | None = None) -> Path | None:
 
 def disconnect(path: Path | None = None) -> Path | None:
     path = path or default_settings_path()
-    if not path.exists():
-        return None
+    if not path.exists() or not is_connected(path):
+        return None                      # nothing of ours in there: do not rewrite or reformat the user's file
     cur = _load(path)
     b = backup(path)
     _write(path, stripped(cur))
