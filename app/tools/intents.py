@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 NUM_WORDS = {w: i for i, w in enumerate(
     "zero one two three four five six seven eight nine ten eleven twelve".split())}
 NUM_WORDS.update({"fifteen": 15, "twenty": 20, "thirty": 30, "forty five": 45, "forty-five": 45,
-                  "forty": 40, "fifty": 50, "sixty": 60, "an": 1, "a": 1, "half an": 0.5})
+                  "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90, "hundred": 100, "one hundred": 100, "an": 1, "a": 1, "half an": 0.5})
 
 
 @dataclass
@@ -173,7 +173,7 @@ def parse(text: str, now: datetime | None = None) -> Intent | None:
         return Intent("todo_remove", {"text": m.group(1).strip()})
 
     # reminders
-    m = re.match(r"remind me (?:to |about )?(.+)", t)
+    m = re.match(r"(?:remind me|ping me|nudge me) (?:to |about )?(.+)", t)
     if m:
         when, rest = parse_when(m.group(1), now)
         rest = re.sub(r"\s+", " ", rest).strip(" ,")
@@ -184,7 +184,8 @@ def parse(text: str, now: datetime | None = None) -> Intent | None:
         return Intent("set_reminder", {"text": "Timer", "when": when})
 
     # volume / brightness
-    m = re.search(r"(?:set )?(?:the )?volume (?:to )?(\d{1,3})", t) or re.search(r"(?:set )?(?:the )?volume to (\w+)", t)
+    m = (re.search(r"(?:set )?(?:the )?volume (?:to )?(\d{1,3})", t) or re.search(r"(?:set )?(?:the )?volume to (\w+)", t)
+         or re.search(r"\b(?:turn|crank|put|bring|set|pump)\b.{0,25}?\b(?:volume|sound)\b.{0,12}?\bto (\w+)", t))
     if m and _num(m.group(1)) is not None:
         return Intent("volume_set", {"level": int(max(0, min(100, _num(m.group(1)))))})
     if re.search(r"\b(volume|turn it|sound) up|louder|raise the volume", t):
@@ -207,9 +208,9 @@ def parse(text: str, now: datetime | None = None) -> Intent | None:
         return Intent("play_music", {"query": m.group(1).strip()})
     if re.search(r"^(play|resume)( the)?( music| song)?$", t):
         return Intent("media_play_pause")
-    if re.search(r"^(pause|stop)( the)?( music| song)?$", t):
+    if re.search(r"^(pause|stop)( the)?( music| song)?$|^pause (whatever|everything|it|the (music|song|video))\b.{0,20}$", t):
         return Intent("media_play_pause")
-    if re.search(r"next (song|track)|skip( this)?( song| track)?$", t):
+    if re.search(r"next (song|track|tune)|skip( this)?( song| track| tune)?$|skip to the next", t):
         return Intent("media_next")
     if re.search(r"(previous|last) (song|track)|go back a (song|track)", t):
         return Intent("media_prev")
@@ -236,7 +237,7 @@ def parse(text: str, now: datetime | None = None) -> Intent | None:
         return Intent("shelf_open")
     if re.search(r"(open|show|bring up) (the )?(controls|quick settings|control panel)", t):
         return Intent("controls_open")
-    if re.search(r"battery( level| status| percentage)?|how much battery", t):
+    if re.search(r"battery( level| status| percentage)?|how much battery|how much (juice|charge|power) (is )?(do i have )?(left|remaining)|how much (juice|charge)", t):
         return Intent("battery")
     m = re.match(r"(?:open|launch|start|run) (.+)", t)
     if m:

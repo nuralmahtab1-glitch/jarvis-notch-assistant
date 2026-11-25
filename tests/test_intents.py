@@ -62,3 +62,28 @@ def test_focus_minutes():
 
 def test_volume_level_clamped():
     assert parse("volume to 150", NOW).args["level"] == 100
+
+
+@pytest.mark.parametrize("text,name,args", [
+    ("crank the sound to eighty", "volume_set", {"level": 80}),
+    ("turn the volume up to 30", "volume_set", {"level": 30}),
+    ("put the sound to fifty", "volume_set", {"level": 50}),
+    ("skip to the next tune", "media_next", {}),
+    ("pause whatever is playing", "media_play_pause", {}),
+    ("how much juice does the laptop have left", "battery", {}),
+    ("how much charge is left", "battery", {}),
+])
+def test_fast_paraphrases_skip_the_brain(text, name, args):
+    it = parse(text)
+    assert it and it.name == name and all(it.args.get(k) == v for k, v in args.items())
+
+
+def test_ping_me_is_a_reminder():
+    it = parse("ping me in fifteen minutes to check the oven")
+    assert it.name == "set_reminder" and "oven" in it.args["text"]
+
+
+@pytest.mark.parametrize("text", ["what is the sound of silence", "turn the page", "pause menu in this game is bad", "tell me a joke", "what is a juice cleanse"])
+def test_paraphrase_rules_do_not_grab_ordinary_questions(text):
+    it = parse(text)
+    assert it is None or it.name not in ("volume_set", "media_play_pause", "media_next", "battery", "set_reminder")

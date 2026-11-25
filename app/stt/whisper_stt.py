@@ -1,7 +1,6 @@
 """Local speech-to-text (faster-whisper, CPU int8). Made by Nur Al Mahtab."""
 from __future__ import annotations
 import threading
-from pathlib import Path
 import numpy as np
 
 from app import paths

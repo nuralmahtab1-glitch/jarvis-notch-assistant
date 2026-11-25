@@ -7,7 +7,6 @@ from typing import Callable
 
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
-from app import config
 from app.core.persona import Persona
 from app.store.db import Settings, Store
 from app.tools import dictation
@@ -158,7 +157,7 @@ class Assistant(QObject):
             self.rec.start()
         except Exception as e:
             self.busy = False
-            self.say(f"I cannot reach the microphone.", src="button")
+            self.say("I cannot reach the microphone.", src="button")
             print("[mic]", e)
             return
         self._partial_stop.clear()
@@ -213,11 +212,14 @@ class Assistant(QObject):
         threading.Thread(target=self._process, args=(audio, kind, src, hwnd), daemon=True).start()
 
     def _process(self, audio, kind, src, hwnd):
+        t0 = time.perf_counter()
         try:
             text = self.stt.transcribe(audio) if self.stt else ""
         except Exception as e:
             print("[stt]", e)
             text = ""
+        self._t_speech = time.perf_counter()
+        print(f"[timing] heard {audio.size / 16000:.1f}s of audio, transcribed in {self._t_speech - t0:.2f}s: {text[:50]!r}", flush=True)
         self.ui(lambda: self._finish(text, kind, src, hwnd))
 
     def _finish(self, text: str, kind: str, src: str, hwnd: int):
@@ -250,7 +252,9 @@ class Assistant(QObject):
                 self.on_action("confirm"); return
             if any(w in t for w in ("no", "cancel", "not now", "don't", "stop")):
                 self.on_action("cancel"); return
+        t0 = time.perf_counter()
         intent = parse(text)
+        print(f"[timing] understood as {intent.name if intent else 'ask-the-brain'} in {(time.perf_counter() - t0) * 1000:.0f} ms", flush=True)
         if not intent:
             self.ask_brain(text, src)
             return
@@ -610,7 +614,9 @@ class Assistant(QObject):
         self.ctl.setText("Thinking", "")
 
         def work():
+            t0 = time.perf_counter()
             d = self.brain.route(text)
+            print(f"[timing] brain took {time.perf_counter() - t0:.2f}s", flush=True)
             self.ui(lambda: self._brain_result(d, src))
         threading.Thread(target=work, daemon=True).start()
 

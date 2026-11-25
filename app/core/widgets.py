@@ -4,7 +4,7 @@ Privacy: the only thing ever sent is the city name you typed (to find its coordi
 coordinates (to get the forecast). No account, no key, never your IP-derived location.
 """
 from __future__ import annotations
-import json, re, urllib.parse, urllib.request
+import json, urllib.parse, urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Callable

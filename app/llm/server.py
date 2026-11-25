@@ -1,6 +1,6 @@
 """Runs llama.cpp's llama-server locally and talks to it. Made by Nur Al Mahtab."""
 from __future__ import annotations
-import http.client, json, socket, subprocess, threading, time, urllib.error, urllib.request
+import http.client, json, os, socket, subprocess, threading, time, urllib.error, urllib.request
 from pathlib import Path
 
 
@@ -31,7 +31,7 @@ class LlamaServer:
             self._log = open(data_dir() / "llama.log", "wb")          # overwritten on every start; helps debugging
             self.proc = subprocess.Popen(
                 [str(self.binary), "-m", str(self.model), "--host", "127.0.0.1", "--port", str(self.port),
-                 "-c", str(self.ctx), "-t", str(self.threads), "--no-webui"],
+                 "-c", str(self.ctx), "-t", str(self.threads), "-tb", str(max(self.threads, min(8, (os.cpu_count() or 4)))), "--no-webui"],
                 stdout=self._log, stderr=subprocess.STDOUT, creationflags=0x08000000)
             t0 = time.time()
             while time.time() - t0 < timeout:

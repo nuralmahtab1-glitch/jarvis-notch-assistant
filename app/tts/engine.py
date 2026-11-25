@@ -5,7 +5,6 @@ speak() is non-blocking; sentences are queued and played back to back; stop() ba
 """
 from __future__ import annotations
 import io, queue, re, threading, wave
-from pathlib import Path
 from typing import Callable
 
 from app import paths

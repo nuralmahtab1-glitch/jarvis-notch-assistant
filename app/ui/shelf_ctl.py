@@ -1,6 +1,5 @@
 """ShelfController: clipboard watcher + copy/paste/drop glue for the Shelf panel. Made by Nur Al Mahtab."""
 from __future__ import annotations
-from pathlib import Path
 from PySide6.QtCore import QMimeData, QObject, Property, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QGuiApplication
 

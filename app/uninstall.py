@@ -6,7 +6,7 @@ deleted if you say yes. The program files are removed by a tiny helper script af
 (a program cannot delete itself while it is running).
 """
 from __future__ import annotations
-import ctypes, os, shutil, subprocess, sys, tempfile, winreg
+import ctypes, os, shutil, subprocess, tempfile, winreg
 from pathlib import Path
 
 from app import config, paths

@@ -9,7 +9,7 @@
 It also lets go by itself when the laptop is unplugged and the battery drops to 15%.
 """
 from __future__ import annotations
-import os, subprocess, sys, time
+import os, subprocess, time
 from pathlib import Path
 from typing import Callable
 
